@@ -4,7 +4,7 @@
 # matching archive/code_old_stefan/ script.
 #
 # REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see WHAT_IS_MISSING.md section 6):
+# machine (see DATA.md):
 #   - data/generated/fabio/*                     (FABIO MRIO matrices)
 #   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
 #   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
@@ -19,7 +19,7 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
-       "See WHAT_IS_MISSING.md section 6.", call. = FALSE)
+       "See DATA.md.", call. = FALSE)
 }
 # NOTE: year-keyed file paths below are parameterized via YEAR, but full
 # year-extension is unvalidated until FABIO data is available to run against.
@@ -105,7 +105,7 @@ tile_names = list.files("data/geo/mb_tiles/",pattern="^.*.tif$")
 if (length(tile_names) == 0) {
   stop("[step 21] No MapBiomas soy land-use tiles found in data/geo/mb_tiles/. ",
        "These 30m tiles must be downloaded from Google Earth Engine (see README / ",
-       "WHAT_IS_MISSING.md). The municipal footprints (step 20) are complete; only the ",
+       "DATA.md). The municipal footprints (step 20) are complete; only the ",
        "grid-level refinement in this step is blocked.", call. = FALSE)
 }
 tile_paths = paste0("data/geo/mb_tiles/",tile_names)

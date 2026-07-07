@@ -89,32 +89,6 @@ No logic changes.
 
 ---
 
-## 06_transport_cost.R
-File: `code/pipeline/06_transport_cost.R` (created)
-
-Source: copy of `R/06_transport_cost.R`.
-
-| Stefan path / value | Change |
-|---|---|
-| top | Added `YEAR` arg parsing + range guard |
-| `results/intermediate/SOY_MUN_fin.rds` | → `results/outputs/05_{YEAR}/SOY_MUN_fin.rds` |
-| `results/intermediate/GEO_MUN_SOY_fin.rds` | → `results/outputs/05_{YEAR}/GEO_MUN_SOY_fin.rds` |
-| `results/intermediate/MUN_capitals.rds` | → `results/outputs/05_{YEAR}/MUN_capitals.rds` |
-| `results/intermediate/rast_temp.tif` and all `osm2014*.gpkg`, `*_rasterized.tif`, `rail.gpkg`, `water.gpkg` | → `results/outputs/06_{YEAR}/` |
-| `data/old/geo/ANTAQ/2013Carga.txt` | → `paste0("data/old/geo/ANTAQ/", YEAR, "Carga.txt")` |
-| `data/old/geo/ANTAQ/2013Carga_Conteinerizada.txt` | → `paste0("data/old/geo/ANTAQ/", YEAR, "Carga_Conteinerizada.txt")` |
-| `xlsx::read.xlsx(..., sheetName="2013")` | → `sheetName = as.character(YEAR)` |
-| `results/intermediate/{ports,stations,cargo_long,dist_matrices}.Rdata` | → `results/outputs/06_{YEAR}/` |
-
-No logic changes. The OSM/DNIT/ANTT/GADM static shapefiles and `data/old/geo/ANTAQ/IP.shp` are kept at Stefan's `data/old/` paths (treated as time-invariant snapshots).
-
-### Data dependencies for 06
-- `data/old/geo/ANTAQ/{YEAR}Carga.txt` and `{YEAR}Carga_Conteinerizada.txt` — port cargo for the target year.
-- `data/old/RailCargo_2006-21_ANTT.xls` sheet `"{YEAR}"` — Stefan's file covers 2006–2021; for ≥ 2022, Stefan's file lacks a sheet for that year.
-- OSM/DNIT/ANTAQ/ANTT geometric shapefiles are reused as-is (assumed quasi-static).
-
----
-
 ## 07_transport_R.R
 File: `code/pipeline/07_transport_R.R` (created)
 
@@ -128,24 +102,6 @@ Source: copy of `R/07_transport_R.R`.
 | `results/intermediate/flows_euclid.rds` | → `results/outputs/07_{YEAR}/flows_euclid.rds` |
 
 No logic changes.
-
----
-
-## 07_transport_GAMS_parallel.R
-File: `code/pipeline/07_transport_GAMS_parallel.R` (created)
-
-Source: copy of `R/07_transport_GAMS_parallel.R`.
-
-| Stefan path | Change |
-|---|---|
-| top | Added `YEAR` arg parsing + range guard |
-| `results/intermediate/SOY_MUN_fin.rds` | → `results/outputs/05_{YEAR}/SOY_MUN_fin.rds` |
-| `load("results/intermediate/{stations,ports,cargo_long,dist_matrices}.Rdata")` | → `results/outputs/06_{YEAR}/` |
-| `results/outputs/gams/GAMS_base_data.gdx` | → `results/outputs/gams/GAMS_base_data_{YEAR}.gdx` |
-| `./results/outputs/gams/bs_tmp` | → `./results/outputs/gams/bs_tmp_{YEAR}` |
-| `./results/outputs/gams/bs_res` and `bs_res/bs_par.csv` | → `./results/outputs/gams/bs_res_{YEAR}/` |
-
-No logic changes. Still requires a GAMS license to run (`igdx("~/gams37.1_linux_x64_64_sfx")`).
 
 ---
 
@@ -310,7 +266,5 @@ Step 09 (`09_sensitivity.R`) is meaningless without the bootstrap and is skipped
 Steps 13–21 (supply, use, MRSUT, MRIO, Leontief, hybrid, footprints, probability maps) are not yet year-parameterized. They depend on the FABIO MRIO output of step 12 and on additional FABIO_exp data products that share the same 1986–2013 limitation as the inputs to step 12.
 
 External requirements that still block end-to-end runs for `YEAR ≥ 2014`:
-1. **GAMS license** for 07_transport_GAMS_parallel.R.
-2. **Year-specific transport data** at `data/old/geo/ANTAQ/{YEAR}Carga*.txt` and a sheet `"{YEAR}"` in `RailCargo_2006-21_ANTT.xls` (Stefan's file caps at 2021).
-3. **Updated FABIO_exp v1/pure** data at `data/new/04/FABIO/FABIO_exp/{v1,pure}/btd_bal.rds` and `cbs_full.rds` covering the target year.
-4. **Year-specific TRASE export** at `data/old/BRAZIL_SOY_{YEAR}_TRASE.csv` (10/11 fall back to the 2013 baseline if missing).
+1. **Updated FABIO_exp v1/pure** data at `data/new/04/FABIO/FABIO_exp/{v1,pure}/btd_bal.rds` and `cbs_full.rds` covering the target year.
+2. **Year-specific TRASE export** at `data/old/BRAZIL_SOY_{YEAR}_TRASE.csv` (10/11 fall back to the 2013 baseline if missing).

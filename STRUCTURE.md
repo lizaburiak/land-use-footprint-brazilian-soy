@@ -18,7 +18,7 @@ soyprint/
 │       ├── footprints/      ←     {YEAR}_{F,P}_{mass,value}.rds
 │       └── base/            ←     old-pipeline intermediates (live plotting deps)
 ├── code/                    ← all code
-│   ├── pipeline/            ←   the model, steps 00–21  + transport_lp/ (Python transport)
+│   ├── pipeline/            ←   the model, steps 00–21
 │   ├── analysis/            ←   paper figures/plots (footprint_*, plot_*, correlation_*, web)
 │   ├── prep/                ←   data-prep feeders (prep_exiobase_*, prep_fabio_*, prep_map_*, …)
 │   ├── shared/              ←   helpers sourced by the pipeline (was R/auxiliary)
@@ -38,7 +38,6 @@ soyprint/
 │                                docs_generators/, market_share_experiment/ — not in any active pipeline
 ├── RUNBOOK.md               ← how to run it (start here)
 ├── STRUCTURE.md             ← this file
-├── WHAT_IS_MISSING.md       ← data / dependency gaps
 └── README.md  LICENSE  soyprint.Rproj
 ```
 
@@ -51,19 +50,18 @@ bash code/run_year_full.sh 2013   # one year (core 00–12 fatal; 13–21 soft-s
 bash code/run_footprints.sh 2010 2020   # footprint chain (steps 13–20) over a year range
 ```
 See `RUNBOOK.md` for the full guide. Logs → `logs/year_YYYY/`. The core runs 00→12 with Euclidean
-transport (skips the GAMS multimode 06/07 and sensitivity 09). (Two older convenience runners,
-`run_year_pathB.sh` and `run_from05.sh`, now live in `archive/legacy_runners/`.)
+transport.
 
 ## code/
 
 | Folder | What it is |
 |---|---|
-| `code/pipeline/` | **The model** — year-parameterized steps `00_*.R … 21_*.R` (year = `commandArgs[1]`, default 2013, range 2000–2022). Reads `data/raw/`, `data/geo/`, `data/trase/`, `data/fabio/`, writes `data/generated/outputs/NN_{YEAR}/`. `00_data_preparation/` holds the rewritten step 00; `transport_lp/` is the Python multimode transport. See `code/pipeline/CHANGELOG.md`. |
+| `code/pipeline/` | **The model** — year-parameterized steps `00_*.R … 21_*.R` (year = `commandArgs[1]`, default 2013, range 2000–2022). Reads `data/raw/`, `data/geo/`, `data/trase/`, `data/fabio/`, writes `data/generated/outputs/NN_{YEAR}/`. `00_data_preparation/` holds the rewritten step 00. See `code/pipeline/CHANGELOG.md`. |
 | `code/analysis/` | Paper figures & plots run *after* the pipeline: `footprint_*`, `plot_*`, `correlation_*`, `compare_*`, `fig_*`, `figstyle.py`, web builders. Read `results/`, write `results/figures/`. |
 | `code/prep/` | Data-prep feeders for the footprint chain & figures: `prep_exiobase_*`, `prep_fabio_X`, `prep_map_*`, `prep_web_data`, `prep_enduse_ha`. |
 | `code/shared/` | Helpers (`fabio_tidy_functions.R`, plotting/maps) sourced by the pipeline as `source("code/shared/...")`. |
 | `code/*.sh`, `*.py`, `*.R` (root) | Runners (`run_all`, `run_year_full`, `run_footprints`) + tools (`download_data.py`, `aggregate_years.R`). |
-| `archive/code_old_stefan/` | Stefan's unmodified 2013 thesis pipeline `00_*.R … 21_*.R` + `gams/` (GAMS transport model). Superseded by `code/pipeline/`; kept for provenance. |
+| `archive/code_old_stefan/` | Stefan's unmodified 2013 thesis pipeline `00_*.R … 21_*.R`. Superseded by `code/pipeline/`; kept for provenance. |
 | `archive/code_python_scaffold/` | Partial Python port of the pipeline (steps 00–04 validated, rest scaffold). Not wired into any runner. |
 
 ## data/ — organized by purpose
@@ -106,7 +104,6 @@ folder as `<folder>/{YEAR}/` (e.g. `correlation_scatter/2013/`, `benchmark_maps/
 
 ## Known data gaps
 
-See `WHAT_IS_MISSING.md` for the full audit. Headlines: the multimode transport (step 06 →
-`transport_lp`) needs a few `data/geo/` files that aren't present; steps 13–21 need
-WU/fineprint's FABIO + EXIOBASE data (`/mnt/nfs_fineprint/…`, not local). Neither blocks the
-default Path B, which runs for all of 2000–2020.
+Steps 13–21 need WU/fineprint's FABIO + EXIOBASE data, which is not bundled here (see
+[`DATA.md`](DATA.md)). This does not block the default Euclidean pipeline, which runs for all
+of 2000–2020.

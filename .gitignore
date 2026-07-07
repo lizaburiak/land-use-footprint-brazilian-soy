@@ -32,8 +32,7 @@ IOT_*_pxp.zip
 *.bbl
 *.blg
 missfont.log
-# paper/ ships source only (.tex/.bib/.cls/.bst); compiled PDFs & latexmk temps stay local
-paper/**/*.pdf
+# paper/ ships .tex/.bib/.cls/.bst + the compiled PDFs; latexmk scratch stays local
 paper/**/tmp*.tmp
 
 # GAMS run artifacts (model is tracked in code/old/gams/; runtime lands under results/)

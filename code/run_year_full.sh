@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 # Run the FULL reproduction pipeline (steps 00 -> 21) for a single year.
 #
-#   Core model (00-12, Euclidean "Path B"): fatal — stops the year on failure.
-#   FABIO MRIO + footprints (13-21):        soft — they stop at a guard when the
-#                                           FABIO/EXIOBASE data is absent (see
-#                                           WHAT_IS_MISSING.md section 4); recorded
-#                                           and skipped, not treated as a failure.
-#
-# Optional multimode transport (06, 07_GAMS, 09) is NOT run here — it needs the
-# ANTAQ/ANTT data + a GAMS licence (or the Python transport_lp). See RUNBOOK.md.
+#   Core model (00-12, Euclidean transport): fatal — stops the year on failure.
+#   FABIO MRIO + footprints (13-21):          soft — they stop at a guard when the
+#                                             FABIO/EXIOBASE data is absent; recorded
+#                                             and skipped, not treated as a failure.
 #
 # Usage: bash code/run_year_full.sh YYYY
 set -u

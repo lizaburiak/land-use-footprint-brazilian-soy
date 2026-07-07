@@ -9,7 +9,6 @@
 #   Step 21 (30m MapBiomas grid maps) is intentionally NOT run: it is blocked
 #   for every year on (a) the MapBiomas soy tiles (data/geo/mb_tiles/, GEE
 #   download) and (b) R packages fasterize / gdalUtilities / rasterVis.
-#   See WHAT_IS_MISSING.md.
 #
 # EXECUTION -------------------------------------------------------------------
 #   Strictly sequential, both across years and across steps, to stay within

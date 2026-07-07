@@ -1,0 +1,317 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Data section
+%% Paper: Mapping the land-use footprint of Brazilian soy embodied in
+%%        international consumption -- a spatially explicit input-output
+%%        approach
+%% Target: Nature Portfolio (Nature Food) -- see docs/paper_plan.md
+%%
+%% Sources and links traced from code/download_data.py, code/pipeline/,
+%% code/prep/, and the data/*/README.md files. All external URLs were
+%% checked and resolve as of July 2026 (Brazilian government portals may
+%% geo-block automated requests but resolve in a browser).
+%%
+%% Uses the official Springer Nature template (sn-jnl.cls) with the
+%% Nature Portfolio reference style (sn-nature). Compile with:
+%%   pdflatex data && bibtex data && pdflatex data && pdflatex data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[pdflatex,sn-nature]{sn-jnl}% Nature Portfolio reference style
+
+%%%% Standard packages
+\usepackage{graphicx}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{geometry}%
+
+\raggedbottom
+
+\begin{document}
+
+\title[Land-use footprint of Brazilian soy]{Mapping the land-use footprint
+of Brazilian soy embodied in international consumption: a spatially explicit
+input--output approach}
+
+\author*[1]{\fnm{Liza} \sur{Buriak}}\email{TODO@wu.ac.at}
+
+\affil*[1]{\orgdiv{Institute for Ecological Economics},
+\orgname{Vienna University of Economics and Business (WU)},
+\orgaddress{\city{Vienna}, \country{Austria}}}
+
+\abstract{\emph{TODO --- Data-only working document. The full abstract lives in
+the main manuscript. Placeholder so the file compiles standalone.}}
+
+\keywords{soy, land footprint, telecoupling, MRIO, FABIO, Brazil, deforestation}
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Data}\label{sec:data}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The model is built entirely from publicly and freely available data. Inputs
+fall into four groups: (i) subnational Brazilian statistics on soy production,
+processing, domestic use and trade; (ii) spatial layers describing the
+multimodal transport network; (iii) administrative and environmental
+geographies used to place and attribute the footprint; and (iv) the global
+input--output backends (FABIO and EXIOBASE) plus the independent supply-chain
+benchmark (Trase). Unless noted otherwise, all series are annual and cover
+2010--2020 at the Brazilian municipality (\emph{munic\'ipio}) level
+($\sim$5{,}570 units). Where a dataset is provided only for a single reference
+year (e.g.\ gridded livestock, household consumption), that year is stated and
+the value is held constant, as detailed below. All source URLs were last
+accessed in July 2026. A programmatic downloader for the machine-retrievable
+sources is provided with the code (\texttt{code/download\_data.py}).
+
+% ==================================================================
+\subsection{Subnational production, processing, consumption and trade}
+\label{subsec:brazil}
+% ==================================================================
+
+\subsubsection{Agricultural production and population (IBGE)}
+Municipal soybean production, planted area and harvested area come from the
+Brazilian Institute of Geography and Statistics (IBGE) automated recovery
+system SIDRA, table 1612 (\emph{Produ\c{c}\~ao Agr\'icola Municipal}),
+variables 109 (planted area, ha), 216 (harvested area, ha) and 214 (production,
+tonnes), for the soybean class \texttt{c81/2713}. Data are pulled from the
+SIDRA API
+(\url{https://apisidra.ibge.gov.br/values/t/1612/n6/all/v/109,216,214/p/{year}/c81/2713};
+table page \url{https://sidra.ibge.gov.br/tabela/1612}). Resident population by
+municipality is taken from SIDRA table 6579 (variable 9324), which runs through
+2021; for 2022 the 2022 Census table 9514 is used. Population enters as a
+proxy for household soy-oil consumption (Methods).
+
+\subsubsection{Livestock herds (IBGE)}
+Municipal herd sizes for ten animal categories (cattle, buffalo, horses, pigs
+and breeding sows, goats, sheep, chickens and laying hens, quail) are from
+SIDRA table 3939 (\emph{Efetivo dos rebanhos}, variable 105, herd-type
+classification \texttt{c79}). Milked-cow counts, used to split dairy from meat
+herds, are from SIDRA table 94 (variable 106). Feedlot cattle come from the
+IBGE Agricultural Census: table 919 (2006 Census) extrapolated with the ABIEC
+growth rate, and table 6911 (2017 Census). All are retrieved from the same
+SIDRA API endpoint pattern
+(\url{https://apisidra.ibge.gov.br/values/t/{table}/n6/all/...}).
+
+\subsubsection{Soy crushing and refining capacity (ABIOVE)}
+Installed processing capacity --- crushing and refining/bottling facilities
+with active-facility counts and daily capacities by municipality --- is from
+the Brazilian Association of Vegetable Oil Industries (ABIOVE), ``Capacidade
+Instalada'' statistics (\url{https://abiove.org.br/estatisticas/}). These
+spreadsheets are downloaded manually and stored as
+\texttt{Processing\_facilities\_\{year\}\_ABIOVE.xlsx} (sheets
+\texttt{processing\_MUN} and \texttt{refining\_bottling\_MUN}).
+
+\subsubsection{Biodiesel capacity (ANP)}
+Biodiesel plant capacity (m$^3$/day per municipality) and the regional share of
+soy as biodiesel feedstock are from the National Agency of Petroleum, Natural
+Gas and Biofuels (ANP) Statistical Yearbook, Table 2.6
+(\url{https://www.gov.br/anp/pt-br/centrais-de-conteudo/publicacoes/anuario-estatistico/}),
+stored as \texttt{Biodiesel\_capacity\_\{year\}\_ANP.xlsx}.
+
+\subsubsection{Household soy-oil consumption and grain storage (IBGE)}
+Per-capita soy-oil acquisition by state, used to distribute national food-oil
+use across municipalities, is from the IBGE Household Budget Survey (POF)
+2017--2018 --- the most recent available --- held constant across years
+(\url{https://www.ibge.gov.br/estatisticas/sociais/educacao/9050-pesquisa-de-orcamentos-familiares.html}).
+Grain-storage capacity by municipality, used to allocate stock changes, is from
+the IBGE Stocks Survey (\emph{Pesquisa de Estoques}), SIDRA table 278
+(\url{https://sidra.ibge.gov.br/tabela/278}).
+
+\subsubsection{National commodity balances (FAO)}
+National supply--use balances that the municipal totals are reconciled against
+are the FAO Food/Commodity Balance Sheets for Brazil (area code 21), items 2555
+(soybeans), 2571 (soybean oil) and 2590 (soybean cake), covering production,
+imports, exports, food, feed, seed, processing, other uses and stock variation.
+These are extracted from the FAOSTAT bulk download
+(\url{https://bulks-faostat.fao.org/production/FoodBalanceSheets_E_All_Data_(Normalized).zip};
+domain page \url{https://www.fao.org/faostat/en/#data/FBS}).
+
+\subsubsection{Livestock distribution and feed rates (FAO)}
+Herds are disaggregated into production systems using the FAO Gridded Livestock
+of the World (GLW3, 2010 reference year) density rasters for cattle, buffalo,
+pigs (extensive/intensive/industrial) and chickens (extensive/intensive)
+\cite{gilbert2018glw}, distributed via the Harvard Dataverse
+(\url{https://dataverse.harvard.edu/dataverse/glw}), together with the FAO
+GLEAM ruminant production-system classification
+(\texttt{glps\_gleam\_61113\_10km.tif}) and GLEAM per-animal feed ratios
+(dry-matter intake and soy/soy-cake shares) \cite{fao2018gleam},
+\url{https://www.fao.org/gleam/resources/en/}. These are static 2010 layers,
+reused for all years; the resulting production-system \emph{shares} (not herd
+sizes, which are annual) are therefore held constant over the study period.
+
+\subsubsection{Municipal-level trade (COMEX/MDIC)}
+Municipality-level exports and imports are from the Brazilian foreign-trade
+database COMEX Stat (Ministry of Development, Industry, Trade and Services),
+filtered to the soy HS4 codes 1201 (soybeans), 1507 (soybean oil) and 2304
+(soybean cake). Per-year municipal files and the country and municipality
+lookup tables are downloaded from
+\url{https://balanca.economia.gov.br/balanca/bd/comexstat-bd/mun/}
+(files \texttt{EXP\_\{year\}\_MUN.csv}, \texttt{IMP\_\{year\}\_MUN.csv}) and
+\url{https://balanca.economia.gov.br/balanca/bd/tabelas/}
+(\texttt{PAIS.csv}, \texttt{UF\_MUN.csv}).
+
+% ==================================================================
+\subsection{Transport network}\label{subsec:transport-data}
+% ==================================================================
+The subnational routing of physical flows (Methods) uses four multimodal
+network layers:
+\begin{itemize}
+  \item \textbf{Roads.} OpenStreetMap road network
+    (\texttt{gis\_osm\_roads\_free\_1.shp}), obtained as a Brazil extract from
+    Geofabrik (\url{https://download.geofabrik.de/south-america/brazil.html});
+    \textcopyright{} OpenStreetMap contributors.
+  \item \textbf{Waterways.} Federal inland-waterway corridors
+    (\emph{Hidrovias}) from the National Department of Transport Infrastructure
+    (DNIT), \url{https://www.gov.br/dnit/pt-br}.
+  \item \textbf{Railways.} Rail lines, stations and annual rail-cargo flows by
+    commodity (soybean, soy cake, vegetable oil) from the National Land
+    Transport Agency (ANTT), 2006--2021
+    (\url{https://dados.antt.gov.br/dataset/transporte-ferroviario-de-cargas-e-passageiros}).
+  \item \textbf{Ports and port cargo.} Port locations and annual waterway-cargo
+    records from the National Waterway Transport Agency (ANTAQ) statistical
+    system, 2017--2022 with a 2013 fallback for earlier years
+    (\url{https://web.antaq.gov.br/anuario/}).
+\end{itemize}
+A small number of soy-relevant rail stations and supplementary port points were
+hand-curated and are distributed with the code.
+
+% ==================================================================
+\subsection{Administrative and environmental geographies}\label{subsec:geo}
+% ==================================================================
+\textbf{Boundaries.} Municipal polygons are IBGE administrative meshes,
+retrieved with the \texttt{geobr} R package \cite{pereira2019geobr}
+(\url{https://ipeagit.github.io/geobr/}; also on CRAN,
+\url{https://cran.r-project.org/package=geobr}) and municipality code/name
+lookups from the IBGE localities API
+(\url{https://servicodados.ibge.gov.br/api/v1/localidades/municipios});
+state-level boundaries for mapping use GADM v3.6
+(\texttt{gadm36\_BRA\_1}, \url{https://gadm.org/}).
+
+\textbf{Biomes and frontier.} Footprint origin is attributed to biomes using
+the IBGE 1:250{,}000 biome layer (\texttt{lm\_bioma\_250.shp}: Amaz\^onia,
+Cerrado, Caatinga, Mata Atl\^antica, Pantanal, Pampa;
+\url{https://www.ibge.gov.br/geociencias/informacoes-ambientais/estudos-ambientais/15842-biomas.html}).
+The agricultural \emph{frontier} is defined as the Amazon biome plus MATOPIBA,
+the Cerrado expansion zone spanning Maranh\~ao, Tocantins, Piau\'i and Bahia.
+MATOPIBA is operationalized as the intersection of the Cerrado biome with these
+four states, which closely approximates the official Embrapa delimitation of
+the region \cite{miranda2014matopiba}.
+
+\textbf{Grid refinement (optional).} An optional 30\,m refinement of the
+municipal footprint uses MapBiomas annual soy land-use tiles
+\cite{souza2020mapbiomas} (\url{https://mapbiomas.org/}), exported from Google
+Earth Engine with an
+adapted version of the official MapBiomas user toolkit
+(\url{https://github.com/mapbiomas-brazil/user-toolkit}). This layer is a
+visual refinement and is not load-bearing for the headline results.
+
+% ==================================================================
+\subsection{Global supply-chain models and benchmark}\label{subsec:mrio-data}
+% ==================================================================
+\textbf{FABIO.} Subnational flows are nested into the Food and Agriculture
+Biomass Input--Output model, version~2 (FABIO v2), built by the fineprint team
+(\url{https://github.com/fineprint-global/fabio}). The v2 matrices cover
+2010--2023 at a resolution of 22{,}263 processes with 123 environmental
+extensions (files \texttt{E}, \texttt{Z\_mass\_b}, \texttt{Z\_value\_b},
+\texttt{Y\_b}), complemented by the v2 build ingredients (balanced commodity
+balance sheets, bilateral trade, tidied livestock and price tables) at the v2
+classification (181 regions $\times$ 123 items). The published FABIO v1.1
+release (1986--2013; DOI \texttt{10.5281/zenodo.2577067}) is cited for
+provenance only and is \emph{not} used, as its classification and time span
+differ \cite{bruckner2019fabio}.
+
+\textbf{EXIOBASE.} The non-soy ``background'' of the economy is supplied by
+EXIOBASE~3 \cite{stadler2018exiobase} in the product-by-product (pxp)
+transformation, 2000--2020, with 9{,}800 $\times$ 9{,}800 flow matrices (49
+regions $\times$ 200 products) and their environmental satellites
+(\url{https://www.exiobase.eu/}; data on Zenodo, DOI
+\texttt{10.5281/zenodo.3583070}). These are hybridised with FABIO for the
+non-soy quadrant of the footprint model.
+
+\textbf{Bilateral trade (FAO).} Re-export disentangling and the FABIO trade
+layer draw on the FAOSTAT Detailed Trade Matrix for Brazil (items 236
+soybeans, 237 soybean oil, 238 soybean cake), from the FAOSTAT bulk download
+(\url{https://bulks-faostat.fao.org/production/Trade_DetailedTradeMatrix_E_All_Data_(Normalized).zip}).
+
+\textbf{Independent benchmark (Trase).} Model flows from origin municipality to
+country of first import are validated against the Trase Brazil soy composite
+dataset, version 2.6.1 (\texttt{brazil\_soy\_v2\_6\_1\_composite.csv},
+2004--2022), from the Trase initiative (\url{https://trase.earth/})
+\cite{godar2015sei,escobar2020trase}. Trase is used exclusively as a
+validation benchmark; no Trase data enter the model itself.
+
+% ==================================================================
+\subsection{Coverage and summary}\label{subsec:coverage}
+% ==================================================================
+The binding constraint on temporal coverage is FABIO v2 (2010--2023), so the
+footprint series is reported for the decade 2010--2020; the origin-to-importer
+flow benchmark against Trase extends back to 2004 and supports a longer
+validation backdrop. Table~\ref{tab:data} summarises all inputs.
+
+\begin{table}[htbp]
+\small
+\caption{Input datasets, by role. All are publicly and freely available;
+per-source access details and URLs are given in the text. ``Munis''
+$=$ Brazilian municipalities.}\label{tab:data}
+\begin{tabular}{@{}p{3.5cm}p{2.3cm}p{3.0cm}p{2.6cm}@{}}
+\toprule
+Dataset & Provider & Role & Coverage \\
+\midrule
+Soy production, area (t.1612)      & IBGE (SIDRA)        & production            & munis, annual \\
+Population (t.6579/9514)           & IBGE (SIDRA)        & food-use proxy        & munis, annual \\
+Herds (t.3939), milk cows (t.94)   & IBGE (SIDRA)        & feed demand           & munis, annual \\
+Feedlot cattle (t.919/6911)        & IBGE (Census)       & feed demand           & munis, 2006/2017 \\
+Crush/refining capacity            & ABIOVE              & processing            & munis, annual \\
+Biodiesel capacity                 & ANP                 & other (biodiesel) use & munis, annual \\
+Soy-oil acquisition (POF)          & IBGE                & food-oil allocation   & states, 2017--18 \\
+Grain storage (t.278)              & IBGE                & stock allocation      & munis, annual \\
+Commodity balance (FBS)            & FAO (FAOSTAT)       & national reconciliation & Brazil, annual \\
+Gridded livestock (GLW3)           & FAO (Dataverse)     & system split          & 10\,km, 2010 \\
+Production systems, feed (GLEAM)    & FAO                 & feed rates            & 10\,km, static \\
+Municipal trade                    & COMEX/MDIC          & exports/imports       & munis, annual \\
+Road network                       & OSM (Geofabrik)     & transport             & national \\
+Waterways                          & DNIT                & transport             & national \\
+Rail lines, stations, cargo        & ANTT                & transport             & national, 2006--21 \\
+Ports, port cargo                  & ANTAQ               & transport             & national, 2017--22 \\
+Municipal boundaries               & IBGE (geobr)        & geometry              & munis \\
+State boundaries                   & GADM v3.6           & mapping               & states \\
+Biomes 1:250k                      & IBGE                & origin attribution    & national \\
+Soy land tiles                     & MapBiomas (GEE)     & grid refinement       & 30\,m, annual \\
+FABIO v2 (MRIO)                    & fineprint           & supply-chain nesting  & global, 2010--23 \\
+EXIOBASE 3 pxp                     & EXIOBASE            & non-soy background    & global, 2000--20 \\
+Detailed trade matrix              & FAO (FAOSTAT)       & re-exports/trade      & Brazil, annual \\
+Trase composite v2.6.1             & Trase               & validation benchmark  & munis, 2004--22 \\
+\botrule
+\end{tabular}
+\end{table}
+
+% ==================================================================
+\subsection{Data availability}\label{subsec:data-availability}
+% ==================================================================
+All input data used in this study are publicly and freely available from the
+providers listed above. They are not redistributed with the code because of
+differing licences; a download script with direct source links is provided
+(\texttt{code/download\_data.py}), and the datasets requiring manual retrieval
+(ABIOVE, ANP, POF, MapBiomas tiles) are documented with step-by-step
+instructions in the repository. The intermediate and final model outputs
+underlying the figures will be deposited on Zenodo upon publication.
+
+% ==================================================================
+\subsection{Code availability}\label{subsec:code-availability}
+% ==================================================================
+The complete modelling pipeline (data preparation, transport allocation,
+FABIO/EXIOBASE nesting, footprint accounting, validation and figures) is
+written in R and Python and released under the GNU GPL~v3 at
+\texttt{<repository URL --- TODO>}. The results reported here have no
+proprietary software dependency. An experimental multimodal-transport module
+included in the repository (not used for the reported results) additionally
+requires a GAMS licence.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliography{refs}%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}

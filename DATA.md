@@ -88,8 +88,8 @@ Needed for the footprint steps (13–21) and transport; obtain separately.
 | Trase composite benchmark | https://trase.earth/ | `data/trase/` |
 | Spatial layers (GADM, OSM roads, DNIT waterways, ANTAQ ports, ANTT rail, IBGE biomes, MapBiomas soy tiles) | see `STRUCTURE.md` | `data/geo/` |
 
-See `WHAT_IS_MISSING.md` for which of these are optional per path (e.g. the GAMS multimode
-transport needs a few extra `data/geo/` files that the default Euclidean path does not).
+The `data/geo/` spatial layers feed the transport step; the footprint steps (13–21)
+additionally require the FABIO v2 and EXIOBASE backends listed above.
 
 ---
 
