@@ -2,7 +2,7 @@
  
 # Mapping the land-use footprint of Brazilian soy embodied in international consumption: A spatially explicit input-output approach
 
-### 🌐 [**Explore the interactive footprint map →**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/web/footprint_map.html)
+### 🌐 [**Explore the interactive footprint map →**](https://lizaburiak.github.io/soyprint-footprint-map/)
 
 ### 📄 Paper drafts (render in-browser): [**Data section**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/paper/data_section/data.pdf) · [**Methods section**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/paper/methods_section/methods.pdf)
 
