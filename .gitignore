@@ -1,0 +1,79 @@
+# R session / project state
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# macOS / editor noise
+.DS_Store
+*.swp
+*~
+
+# Data & generated folders — too large for git, regenerated locally
+data/
+results/
+# (results/ covers results/outputs/ 14G and results/intermediate/ too)
+# large uploaded archives
+*.zip
+rstudio-export.zip
+IOT_*_pxp.zip
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.lst
+*.lxi
+*.gdx
+*.synctex.gz
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+missfont.log
+# paper/ ships source only (.tex/.bib/.cls/.bst); compiled PDFs & latexmk temps stay local
+paper/**/*.pdf
+paper/**/tmp*.tmp
+
+# GAMS run artifacts (model is tracked in code/old/gams/; runtime lands under results/)
+results/outputs/gams/
+cplex.opt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Misc legacy / scratch
+/temp
+/lib
+/old*
+ignore
+R/depr
+
+# Specific large data files (kept from original .gitignore)
+GEO_MUN_2013_IBGE_merged.gpkg
+MUN_dist_long.csv
+transport_cost.csv
+gis_osm_roads_free_1*
+2013Carga.txt
+btd_bal.rds
+F_mass.rds
+P_mass.rds
+F_value.rds
+P_value.rds
+
+# Web map generated data (regenerable via code/analysis/build_web_*.py + prep_web_data.R)
+web/data/
+web/municipios.geojson
+
+# Stefan's original FABIO data moved under archive/ (not regenerable here)
+archive/fabio_stefan/
+archive/data_stefan_2013/
+# Broken IBGE livestock CSVs (2014+ miss "Galináceos - total"); kept local for reference only
+archive/broken_livestock_2014plus/
+
+# Stray input data staged under code/ — real inputs live in data/raw/ (git-ignored)
+code/inputs/
