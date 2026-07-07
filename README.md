@@ -13,8 +13,7 @@ The model requires a wide range of input data for all modelling steps. All data 
 
 > **Repository layout:** see [`STRUCTURE.md`](STRUCTURE.md) for the folder map — the
 > year-parameterized model (`code/pipeline/`), its paper figures (`code/analysis/`) and
-> prep feeders (`code/prep/`), the purpose-organized `data/` (raw/geo/fabio/trase/exiobase),
-> and Stefan Trsek's original 2013 pipeline preserved under `archive/code_old_stefan/`.
+> prep feeders (`code/prep/`), and the purpose-organized `data/` (raw/geo/fabio/trase/exiobase).
 >
 > **Running it:** from the repo root, `bash code/run_all.sh` runs the full pipeline
 > (steps 00–21) for all years 2000–2020 (or `bash code/run_all.sh 2013 2013` for one year).
