@@ -33,7 +33,7 @@ soyprint/
 │         <content_folder>/{YEAR}/ — e.g. correlation_scatter/2013/, benchmark_maps/2013/ )
 ├── logs/                    ← run logs (year_YYYY/) + run_all_summary.txt
 ├── docs/                    ← paper_plan, literature_review, figures_plan, validation records
-│                                (comparison_2013, multi_year), Thesis_Trsek_2507.pdf, workflow_scheme.png
+│                                (comparison_2013, multi_year), Thesis_Trsek_2507.pdf
 ├── archive/                 ←   code_old_stefan/ (2013 thesis pipeline), code_python_scaffold/,
 │                                docs_generators/, market_share_experiment/ — not in any active pipeline
 ├── RUNBOOK.md               ← how to run it (start here)
