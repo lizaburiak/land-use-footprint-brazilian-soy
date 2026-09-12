@@ -1,0 +1,8 @@
+pyomo>=6.7
+highspy>=1.7
+pyreadr>=0.5
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+# Optional, only if pyreadr cannot decode some .Rdata files:
+# rpy2>=3.5

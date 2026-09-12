@@ -1,0 +1,98 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Annex: access links for every dataset of the data table. Dataset
+%% names match the table; providers, roles and coverage are given
+%% there and are not repeated here. Only access-relevant notes are
+%% added (API patterns, manual downloads, blocked portals).
+%% All URLs verified July 2026.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Data access links}\label{app:links}
+
+Dataset names below match Table~\ref{tab:data}, which gives provider,
+role and coverage; this annex adds only the access links. All URLs were
+last verified in July 2026. Brazilian government portals may reject
+automated requests but resolve in a browser. A programmatic downloader
+covering the machine-retrievable sources ships with the code
+(\texttt{code/download\_data.py}).
+
+\subsection*{Brazilian subnational statistics}
+\begin{itemize}
+  \item \textbf{Soy production, area} (SIDRA table 1612):
+    \url{https://sidra.ibge.gov.br/tabela/1612}; API pattern
+    \url{https://apisidra.ibge.gov.br/values/t/1612/n6/all/v/109,216,214/p/{year}/c81/2713}.
+  \item \textbf{Population} (tables 6579/9514), \textbf{herds} (table
+    3939), \textbf{milk cows} (table 94), \textbf{feedlot cattle}
+    (tables 919/6911): same API pattern with the respective table
+    number.
+  \item \textbf{Grain storage} (table 278):
+    \url{https://sidra.ibge.gov.br/tabela/278}.
+  \item \textbf{Feedlot confinement series} (ABIEC Beef Report; manual
+    download): \url{https://www.abiec.com.br/publicacoes/}.
+  \item \textbf{Crush/refining capacity} (manual download):
+    \url{https://abiove.org.br/estatisticas/}.
+  \item \textbf{Biodiesel capacity} (Statistical Yearbook table 2.6;
+    manual download):
+    \url{https://www.gov.br/anp/pt-br/centrais-de-conteudo/publicacoes/anuario-estatistico/}.
+  \item \textbf{Soy-oil acquisition (POF)}:
+    \url{https://www.ibge.gov.br/estatisticas/sociais/educacao/9050-pesquisa-de-orcamentos-familiares.html}.
+  \item \textbf{Municipal trade}: per-year files
+    \url{https://balanca.economia.gov.br/balanca/bd/comexstat-bd/mun/}
+    (\texttt{EXP\_\{year\}\_MUN.csv}, \texttt{IMP\_\{year\}\_MUN.csv});
+    lookup tables
+    \url{https://balanca.economia.gov.br/balanca/bd/tabelas/}
+    (\texttt{PAIS.csv}, \texttt{UF\_MUN.csv}). Directory listings are
+    blocked; the files themselves download normally.
+\end{itemize}
+
+\subsection*{National balances and feed parameters}
+\begin{itemize}
+  \item \textbf{Commodity balance (FBS)}:
+    \url{https://www.fao.org/faostat/en/#data/FBS}; bulk file
+    \url{https://bulks-faostat.fao.org/production/FoodBalanceSheets_E_All_Data_(Normalized).zip}.
+  \item \textbf{Detailed trade matrix}: bulk file
+    \url{https://bulks-faostat.fao.org/production/Trade_DetailedTradeMatrix_E_All_Data_(Normalized).zip}.
+  \item \textbf{Gridded livestock (GLW3)}:
+    \url{https://dataverse.harvard.edu/dataverse/glw}.
+  \item \textbf{Production systems, feed (GLEAM)}:
+    \url{https://www.fao.org/gleam/resources/en/}.
+\end{itemize}
+
+\subsection*{Transport network layers}
+\begin{itemize}
+  \item \textbf{Road network}:
+    \url{https://download.geofabrik.de/south-america/brazil.html}.
+  \item \textbf{Waterways}:
+    \url{https://www.gov.br/dnit/pt-br/assuntos/atlas-e-mapas}; download
+    tool VGeo \url{https://servicos.dnit.gov.br/vgeo/} (may reject
+    automated requests).
+  \item \textbf{Rail lines, stations, cargo}:
+    \url{https://dados.antt.gov.br/dataset/transporte-ferroviario-de-cargas-e-passageiros}.
+  \item \textbf{Ports, port cargo}:
+    \url{https://web.antaq.gov.br/anuario/} (temporarily unreachable at
+    the July 2026 check; re-verify before use).
+\end{itemize}
+
+\subsection*{Geographies}
+\begin{itemize}
+  \item \textbf{Municipal boundaries} (\texttt{geobr}):
+    \url{https://github.com/ipeaGIT/geobr};
+    \url{https://cran.r-project.org/package=geobr}; localities API
+    \url{https://servicodados.ibge.gov.br/api/v1/localidades/municipios}.
+  \item \textbf{State boundaries}: \url{https://gadm.org/}.
+  \item \textbf{Biomes 1:250k}:
+    \url{https://www.ibge.gov.br/geociencias/informacoes-ambientais/estudos-ambientais/15842-biomas.html}.
+  \item \textbf{Soy land tiles} (via Google Earth Engine):
+    \url{https://mapbiomas.org/}; export toolkit
+    \url{https://github.com/mapbiomas-brazil/user-toolkit}.
+\end{itemize}
+
+\subsection*{Global models and reference series}
+\begin{itemize}
+  \item \textbf{FABIO v2 / v1.1}:
+    \url{https://github.com/fineprint-global/fabio}; v1.1 archive DOI
+    \texttt{10.5281/zenodo.2577066}.
+  \item \textbf{EXIOBASE 3 pxp}: \url{https://www.exiobase.eu/};
+    data DOI \texttt{10.5281/zenodo.3583070}.
+  \item \textbf{Trase composite v2.6.1}: \url{https://trase.earth/};
+    supply-chain dataset DOI \texttt{10.48650/DCE3-JJ97} (v2.6).
+\end{itemize}

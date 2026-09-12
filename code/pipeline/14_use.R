@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("data/fabio/v2/inst")) == 0) {
@@ -21,8 +11,6 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 ### use tables ###
 
@@ -55,7 +43,6 @@ sup <- readRDS("data/generated/fabio/sup.rds")
 if ("use" %in% names(cbs)) cbs[, use := NULL]
 
 use_items <- fread("data/fabio/v2/inst/items_use.csv")
-#processes <- unique(use_items[,1:2]) ##--
 
 
 # Use ---------------------------------------------------------------------
@@ -596,7 +583,13 @@ if (optimize) {
   # v2 PORT: use the v2 build's pre-computed feedstock optimisation. Pick the latest
   # optim_results_*.rds in data/fabio/v2/ (downloaded from /home/bruckner2/fabio/data/),
   # falling back to the old intermediate path if present.
-  .opt <- sort(list.files("data/fabio/v2", pattern = "^optim_results_.*\\.rds$",
+  # PRE-2010: the v2 optim files only cover 2010-2022 and the year merge below NAs
+  # silently for missing years -- use the v1.1 build's file (1961-2019, identical
+  # schema, from /mnt/nfs_fineprint/tmp/fabio/v1.1/data/) for earlier years.
+  # SOYPRINT_FORCE_V11=1 forces the v1.1 path on 2010+ years (vintage cross-checks).
+  .use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
+  .opt_dir <- if (.use_v11) "data/fabio/v1.1" else "data/fabio/v2"
+  .opt <- sort(list.files(.opt_dir, pattern = "^optim_results_.*\\.rds$",
                           full.names = TRUE), decreasing = TRUE)
   .opt_path <- if (length(.opt)) .opt[1] else
                "data/generated/fabio/optim_results_2021-11-04.rds"

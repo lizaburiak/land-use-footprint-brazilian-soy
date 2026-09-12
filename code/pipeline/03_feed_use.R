@@ -4,6 +4,7 @@
 library(dplyr)
 library(sf)
 library(openxlsx)
+source("code/pipeline/00_checks.R")
 
 # Year parameter (default 2013)
 args <- commandArgs(trailingOnly = TRUE)
@@ -32,6 +33,32 @@ feed_ratios <- mutate(feed_ratios, bean_dm = DM*bean/100, cake_dm = DM*cake/100)
 # total (wet matter) intake per animal and year in kg and tons
 feed_ratios <- mutate(feed_ratios, bean_kg = bean_dm / dm_content["bean"], cake_kg = cake_dm / dm_content["cake"])
 feed_ratios <- mutate(feed_ratios, bean_t = bean_kg/1000, cake_t = cake_kg/1000)
+# SENSITIVITY: scale per-animal soy/cake intake (GLEAM rates) by MC_FEED_MULT
+# (default 1 = no-op). Used by the OAT uncertainty analysis
+# (code/analysis/mc_sensitivity.R).
+.mc_feed <- suppressWarnings(as.numeric(Sys.getenv("MC_FEED_MULT", "1")))
+if (!is.na(.mc_feed) && .mc_feed != 1) {
+  feed_ratios <- mutate(feed_ratios, bean_t = bean_t * .mc_feed, cake_t = cake_t * .mc_feed)
+  message(sprintf("[03] SENSITIVITY MC_FEED_MULT = %.3f applied to soy/cake intake", .mc_feed))
+}
+# SENSITIVITY: perturb the RELATIVE per-system feed rates (GLEAM-rate uncertainty)
+# by an independent mean-1 lognormal factor per livestock system, seeded.
+# NOTE: a *uniform* multiplier (MC_FEED_MULT above) cancels exactly in the CBS
+# rescale below (lines ~64-65), so it does not move the spatial allocation; only
+# system-relative changes shift feed toward municipalities with the boosted mix.
+# MC_FEED_SYS_JITTER = lognormal sigma (default 0 = no-op); MC_FEED_SEED = seed.
+.mc_jit <- suppressWarnings(as.numeric(Sys.getenv("MC_FEED_SYS_JITTER", "0")))
+if (!is.na(.mc_jit) && .mc_jit > 0) {
+  .feed_seed <- suppressWarnings(as.integer(Sys.getenv("MC_FEED_SEED", "1")))
+  if (is.na(.feed_seed)) .feed_seed <- 1L
+  set.seed(.feed_seed)
+  .nsys <- nrow(feed_ratios)
+  .fb <- exp(rnorm(.nsys, -0.5 * .mc_jit^2, .mc_jit))   # per-system, mean 1
+  .fc <- exp(rnorm(.nsys, -0.5 * .mc_jit^2, .mc_jit))
+  feed_ratios <- mutate(feed_ratios, bean_t = bean_t * .fb, cake_t = cake_t * .fc)
+  message(sprintf("[03] SENSITIVITY MC_FEED_SYS_JITTER=%.3f (seed=%d) applied to %d per-system rates",
+                  .mc_jit, .feed_seed, .nsys))
+}
 
 
 # compute feed use for each MU by specie ------------------------
@@ -59,8 +86,10 @@ cake_feed_t_fin <- cake_feed_t*(CBS_SOY["cake", "feed"]/sum(cake_feed_t, na.rm =
 ### add total soybean and cake feed use per MU to the main table
 SOY_MUN <- mutate(SOY_MUN, feed_bean = rowSums(bean_feed_t_fin, na.rm = TRUE), feed_cake = rowSums(cake_feed_t_fin, na.rm = TRUE))
 
-all.equal(sum(SOY_MUN$feed_bean),CBS_SOY["bean", "feed"])
-all.equal(sum(SOY_MUN$feed_cake),CBS_SOY["cake", "feed"])
+assert_equal(sum(SOY_MUN$feed_bean), CBS_SOY["bean", "feed"],
+             "03 municipal bean feed = national feed use")
+assert_equal(sum(SOY_MUN$feed_cake), CBS_SOY["cake", "feed"],
+             "03 municipal cake feed = national feed use")
 
 # add new columns to GEO dataset
 GEO_MUN_SOY <- left_join(GEO_MUN_SOY, SOY_MUN[,c("co_mun","feed_bean", "feed_cake")], by="co_mun")

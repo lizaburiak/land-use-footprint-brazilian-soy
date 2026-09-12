@@ -8,23 +8,17 @@ stopifnot(YEAR >= 2000, YEAR <= 2022)
 
 library(dplyr)
 library(sf)
+source("code/pipeline/00_checks.R")
 
 write = TRUE
 
-# Stock-change handling mode (env var STOCK_MODE; see code/pipeline/CHANGELOG.md):
-#   "supply_side" (DEFAULT) — a net national stock WITHDRAWAL is treated as SUPPLY:
-#                 |stock| is added to total_supply and excluded from total_use, keeping
-#                 the step-01 storage allocation (no realloc). This matches the
-#                 commodity-balance identity (a drawdown is a source of current-year
-#                 supply; see paper Methods Eq. 2), is consistent with FABIO's own stock
-#                 treatment, and keeps the consumption footprint within the harvested-area
-#                 envelope (verified 2010-2022).
-#   "use_prop"    — legacy: a net withdrawal is reallocated across municipalities by USE
-#                 base and kept on the use side (total_use), via realloc_withdrawal().
-# ADDITION years (and every product with a net addition) are identical in both modes.
-STOCK_MODE <- Sys.getenv("STOCK_MODE", "supply_side")
-stopifnot(STOCK_MODE %in% c("use_prop", "supply_side"))
-cat("STOCK_MODE:", STOCK_MODE, "\n")
+# Stock-change handling (see code/pipeline/CHANGELOG.md): a net national stock
+# WITHDRAWAL is treated as SUPPLY - |stock| is added to total_supply and excluded from
+# total_use, keeping the step-01 storage allocation (no realloc). This matches the
+# commodity-balance identity (a drawdown is a source of current-year supply; see paper
+# Methods Eq. 2), is consistent with FABIO's own stock treatment, and keeps the
+# consumption footprint within the harvested-area envelope (verified 2010-2022).
+# (The legacy STOCK_MODE=use_prop use-side reallocation was retired 2026-08; git history.)
 
 # load data -----------------------------------------------------------------------------------
 SOY_MUN <- readRDS(paste0("data/generated/outputs/03_", YEAR, "/SOY_MUN_03.rds"))
@@ -98,43 +92,17 @@ SOY_MUN[,names(SOY_MUN_cbs)] <- as.data.frame(t(t(SOY_MUN_cbs)*SOY_agg$ratio))
 # check for balance, adding columns for total supply and demand of each product
 SOY_agg$MUN_fin <- colSums(SOY_MUN[,names(SOY_MUN_cbs)])
 SOY_agg$check <- SOY_agg$MUN_fin == SOY_agg$FAO
-cat("all items balanced: ", all.equal(SOY_agg$FAO,SOY_agg$MUN_fin), "\n")
-
-# --- stock WITHDRAWAL reallocation (fix for negative municipal total_use) -------------------
-# A negative national stock change (drawdown) was distributed across municipalities by grain
-# STORAGE capacity (step 01). That put large withdrawals on municipalities with little/no soy
-# use, driving total_use negative -> the step-12 re-export inversion went degenerate for the
-# drawdown years (2012, 2018-2020). A withdrawal is soy taken from stock to be used/exported,
-# so allocate it proportional to each municipality's USE BASE instead. Then
-#   total_use = base + base/sum(base)*S = base*(1 + S/sum(base)) >= 0   (since |S| < sum(base)).
-# Additions (S >= 0) keep Stefan's storage-capacity split untouched (so 2010-2017 are unchanged).
-realloc_withdrawal <- function(stock, base) {
-  S <- sum(stock, na.rm = TRUE)
-  if (S >= 0) return(stock)
-  b <- pmax(base, 0); tb <- sum(b, na.rm = TRUE)
-  if (tb <= 0) return(stock)
-  w <- b / tb; w[!is.finite(w)] <- 0
-  w * S
-}
-if (STOCK_MODE == "use_prop") {
-  # current behaviour: reallocate a net withdrawal onto the use side by use base
-  SOY_MUN$stock_bean <- realloc_withdrawal(SOY_MUN$stock_bean,
-    with(SOY_MUN, exp_bean + food_bean + feed_bean + seed_bean + proc_bean))
-  SOY_MUN$stock_oil  <- realloc_withdrawal(SOY_MUN$stock_oil,
-    with(SOY_MUN, exp_oil + food_oil + other_oil))
-  SOY_MUN$stock_cake <- realloc_withdrawal(SOY_MUN$stock_cake,
-    with(SOY_MUN, exp_cake + feed_cake))
-}
-# supply_side: leave stock_* as the step-01 storage / production allocation (no realloc);
-# a net national withdrawal is reclassified to the supply side just below.
+assert_equal(SOY_agg$MUN_fin, SOY_agg$FAO,
+             "05 municipal aggregates match national FAO totals after rescaling")
 
 # stock_split(): where does a product's stock term go in the balance?
-#   supply_side + net national WITHDRAWAL (sum(stock) < 0) -> |stock| onto SUPPLY, none on use.
-#   otherwise (all addition products; everything in use_prop) -> stock stays on the USE side.
-# This makes ADDITION years bit-identical in both modes, and guarantees total_use >= 0 in
-# supply_side (use side is then just the non-negative use base).
+#   net national WITHDRAWAL (sum(stock) < 0) -> |stock| onto SUPPLY, none on use.
+#   otherwise (net addition) -> stock stays on the USE side.
+# This guarantees total_use >= 0 (use side is then just the non-negative use base);
+# without it, storage-capacity-allocated withdrawals drove total_use negative and the
+# step-12 re-export inversion went degenerate for drawdown years (2012, 2018-2020).
 stock_split <- function(stock) {
-  if (STOCK_MODE == "supply_side" && sum(stock, na.rm = TRUE) < 0)
+  if (sum(stock, na.rm = TRUE) < 0)
     list(sup = -stock, use = rep(0, length(stock)))
   else
     list(sup = rep(0, length(stock)), use = stock)

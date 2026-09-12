@@ -1,0 +1,157 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Results section (brief, working draft)
+%% Paper: Mapping the land-use footprint of Brazilian soy embodied in
+%%        international consumption -- a spatially explicit input-output
+%%        approach
+%% Target: Nature Portfolio (Nature Food) -- see docs/paper_plan.md
+%%
+%% Figures are read directly from results/plots_2001_2022/ via
+%% \graphicspath, so re-running the plot scripts refreshes the PDF.
+%% Compile with:
+%%   pdflatex results && pdflatex results
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[pdflatex,sn-nature]{sn-jnl}% Nature Portfolio reference style
+
+%%%% Standard packages
+\usepackage{graphicx}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{geometry}%
+
+\graphicspath{{../../results/plots_2001_2022/}}
+
+\raggedbottom
+
+\begin{document}
+
+\title[Brazil's shifting soy land footprint]{Brazil's soy land footprint
+is shifting toward China and toward the agricultural frontier}
+
+\author*[1]{\fnm{Liza} \sur{Buriak}}\email{TODO@wu.ac.at}
+
+\affil*[1]{\orgdiv{Institute for Ecological Economics},
+\orgname{Vienna University of Economics and Business (WU)},
+\orgaddress{\city{Vienna}, \country{Austria}}}
+
+\abstract{\emph{TODO: Results-only working document. The full abstract lives in
+the main manuscript. Placeholder so the file compiles standalone.}}
+
+\keywords{soy, land footprint, telecoupling, MRIO, FABIO, Brazil, deforestation}
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Results}\label{sec:results}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Two decades of footprint growth and a hand-off between consumers}
+\label{sec:res-destinations}
+
+The land-use footprint of Brazilian soy embodied in consumption grew from
+9.4~Mha in 2001 to 41.0~Mha in 2022, closely tracking the expansion of the
+harvested area itself (Fig.~\ref{fig:destination}a). The defining structural
+change of the period is a hand-off between the two dominant consumers
+(Fig.~\ref{fig:destination}b). In 2001 the EU-27 accounted for 54\% of the
+footprint and China for 11\%; the two curves cross in 2009--2010, and by 2022
+China alone accounts for 42\% (17.2~Mha) against an EU-27 share below 20\%
+(7.8~Mha). The EU footprint is remarkably stable in absolute terms
+(5.1~Mha in 2001, 7.8~Mha in 2022): virtually all of the growth in Brazilian
+soy land over two decades served demand growth in China and the rest of Asia
+(1.3 to 12.0~Mha), not in Europe.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_by_destination.pdf}
+\caption{Brazilian soy land-use footprint by destination region, 2001--2022.
+(a)~Absolute footprint (million hectares of soy land embodied in consumption).
+(b)~Regional shares of the total footprint. Years before 2010 are computed on
+the FABIO~v1.1 backend and 2010 onwards on FABIO~v2 (Methods); the vintage
+seam shifts the Brazil-domestic share by a few percentage points around
+2009/2010 but does not affect the ranking or the crossing point.}
+\label{fig:destination}
+\end{figure}
+
+\subsection{From commodity exports to embodied animal products}
+\label{sec:res-enduse}
+
+Throughout the period, most of the footprint reaches consumers in commodity
+form, as beans, soybean meal, or oil (Fig.~\ref{fig:enduse}). From 2010
+onwards, when the end-use attribution is fully comparable across years,
+roughly a quarter of the footprint is embodied in animal products
+(meat, dairy and eggs) consumed at the destination, and the non-food and
+industrial share roughly doubles after Brazil's 2008 biodiesel blending
+mandate: the non-food footprint rises from 0.8~Mha in 2007 to 1.5~Mha in
+2008 and 2.5~Mha by 2013. Shares before 2010 are shown for completeness but
+are not directly comparable, because the v1.1 balance sheets book most
+soy-chain consumption at the commodity level (Methods).
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{fig_enduse.pdf}
+\caption{Brazilian soy land-use footprint by end-use, 2001--2022.
+(a)~Absolute footprint. (b)~End-use shares. The step at 2009/2010 in the
+animal-products share is a classification seam between the FABIO v1.1 and v2
+balance sheets, not a real dietary shift (Methods); end-use statements in the
+text are therefore restricted to 2010--2022.}
+\label{fig:enduse}
+\end{figure}
+
+\subsection{The footprint marches northwest}
+\label{sec:res-spatial}
+
+Spatially, the two decades redraw the map of where consumed soy land sits
+(Fig.~\ref{fig:maps}). In 2001 the footprint concentrated in the southern
+states and an emerging Mato Grosso core. By 2022 the centre of mass has moved
+decisively into the Cerrado frontier: northern Mato Grosso and the MATOPIBA
+region dominate, and the municipal pattern of China's footprint, nearly
+empty in 2001 (1.0~Mha), spans the entire frontier by 2022 (17.2~Mha). The
+EU-27 pattern, by contrast, changes far less, consistent with its flat
+absolute footprint.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{map_2001_2022.png}
+\caption{Municipal origin of the Brazilian soy land-use footprint, 2001
+versus 2022, for the total and the four major destination groups. All panels
+share one colour scale (square-root scaled).}
+\label{fig:maps}
+\end{figure}
+
+\subsection{Validation: agreement with Trase grows with flow size}
+\label{sec:res-validation}
+
+We validate the modelled municipality-to-country export flows against the
+independent, shipment-based Trase supply-chain data (2004--2022).
+Pooling all 127{,}862 municipality~$\times$~destination~$\times$~year flows
+above one tonne, the log-flow correlation with Trase is $r = 0.68$ and 54\%
+of flows fall within a factor of three of the Trase value. Agreement rises
+strongly with flow size (Fig.~\ref{fig:rocket}): small flows scatter widely,
+while the large flows that carry the footprint converge onto the 1:1 line,
+so the model is most reliable exactly where the volume is. This holds in
+every year, including the pre-2010 extension: the 2005 cross-section
+validates at $r = 0.65$, statistically indistinguishable from 2010
+($r = 0.73$). At the destination level, the pooled direct Pearson
+correlation with Trase rises from 0.43 in 2004 to around 0.7 from 2011
+onwards, and our 2013 value (0.685) reproduces the published benchmark of
+the original single-year model (0.692). Per-tonne land intensities are
+essentially flat across destinations (about 0.33~ha per tonne of
+soybean-equivalent, the inverse of the national yield), with the EU-27 and
+China within $\pm$4\% of each other over 2010--2015.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.72\textwidth]{rocket_plot.pdf}
+\caption{Rocket plot: modelled municipal soy export flows against Trase,
+all years pooled (2004--2022), both axes log10 tonnes. Contours show point
+density; the dashed line is 1:1. Flows below one tonne on either side are
+excluded; the visible lower bound on the Trase axis (about 28~t) is the
+granularity floor of the Trase composite itself.}
+\label{fig:rocket}
+\end{figure}
+
+\end{document}

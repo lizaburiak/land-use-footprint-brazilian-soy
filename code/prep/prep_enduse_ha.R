@@ -8,7 +8,7 @@
 # ============================================================================
 suppressMessages({library(Matrix); library(data.table)})
 
-OUT <- "results/figures/footprint_dynamics/csv"; dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
+OUT <- Sys.getenv("FPD_OUT", "results/figures/footprint_dynamics/csv"); dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 fps   <- list.files("data/generated/footprints", pattern = "^[0-9]{4}_F_mass\\.rds$", full.names = TRUE)
 YEARS <- sort(as.integer(sub(".*/([0-9]{4})_F_mass\\.rds$", "\\1", fps)))
 items <- fread("data/fabio/v2/inst/items_full.csv")

@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("data/fabio/v2/inst")) == 0) {
@@ -21,8 +11,6 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 ### calculate footprints on the level of municipalities ###
 
@@ -37,14 +25,20 @@ LB_mass <- readRDS(paste0("data/generated/fabio/", YEAR, "_B_inv_mass.rds"))
 LA_value <- readRDS(paste0("data/generated/fabio/", YEAR, "_L_value.rds"))
 LB_value <- readRDS(paste0("data/generated/fabio/", YEAR, "_B_inv_value.rds"))
 X <- readRDS("data/generated/fabio/X.rds")
-X <- X
 YA <- readRDS("data/generated/fabio/Y_hybrid.rds")
 YA <- YA[[as.character(YEAR)]]
 load(paste0("data/exiobase/pxp/", YEAR, "_Y.RData"))
 YB <- as(Y, "sparseMatrix"); rm(Y)
 load("data/exiobase/Y.codes.RData")
 load("data/exiobase/pxp/IO.codes.RData")
-Emat <- readRDS("data/fabio/v2/E.rds")[[as.character(YEAR)]]
+# PRE-2010: v2's E.rds starts in 2010; the v1.1 build's E (data/fabio/v1.1/, from
+# /mnt/nfs_fineprint/tmp/fabio/v1.1/) covers 1986-2013 as a long table -- the exact
+# format Stefan's original code consumed. Branch again below where the land-use
+# vector is built.
+# SOYPRINT_FORCE_V11=1 forces the v1.1 path on 2010+ years (vintage cross-checks).
+.use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
+Emat <- readRDS(if (.use_v11) "data/fabio/v1.1/E.rds" else
+                  "data/fabio/v2/E.rds")[[as.character(YEAR)]]
 cbs <- readRDS("data/generated/fabio/cbs_final.rds")
 areas <- unique(cbs[,.(area_code, area)])
 areas_mun <- areas[area_code > 1000,]
@@ -63,14 +57,26 @@ items <- fread("data/fabio/v2/inst/items_full.csv")
 proc_names <- rownames(LA_mass)
 landuse <- setNames(numeric(length(proc_names)), proc_names)
 
-# national: map E columns "ISO3_commcode" -> "areacode_commcode"
-e_area <- regions$code[match(sub("_.*", "", colnames(Emat)), regions$iso3c)]
-e_key  <- paste0(e_area, "_", sub(".*_", "", colnames(Emat)))
-nat_lu <- setNames(as.numeric(Emat["land_crop", ]), e_key)
-.nat_hit <- intersect(e_key, proc_names)
+if (!.use_v11) {
+  # national: map E columns "ISO3_commcode" -> "areacode_commcode"
+  e_area <- regions$code[match(sub("_.*", "", colnames(Emat)), regions$iso3c)]
+  e_key  <- paste0(e_area, "_", sub(".*_", "", colnames(Emat)))
+  nat_lu <- setNames(as.numeric(Emat["land_crop", ]), e_key)
+  cat("[20] E cols with no area_code:", sum(is.na(e_area)), "\n")
+} else {
+  # PRE-2010: v1.1's E is a long table (area_code / item_code / landuse). Its
+  # comm_codes are OFFSET relative to v2 (v1.1 c069 = v2 c068 etc.), so map through
+  # the stable FAO item_code to the v2 comm_code the nested matrix rows use. NB the
+  # v1.1 `landuse` stressor also covers pasture on livestock processes (v2's
+  # land_crop is cropland-only); the soy rows themselves are cropland either way.
+  Edt <- as.data.table(Emat)
+  Edt[, comm_v2 := items$comm_code[match(item_code, items$item_code)]]
+  Edt <- Edt[is.na(comm_v2) == FALSE & is.na(landuse) == FALSE]
+  nat_lu <- setNames(as.numeric(Edt$landuse), paste0(Edt$area_code, "_", Edt$comm_v2))
+}
+.nat_hit <- intersect(names(nat_lu), proc_names)
 landuse[.nat_hit] <- nat_lu[.nat_hit]
-cat("[20] national land rows matched:", length(.nat_hit), "/", ncol(Emat),
-    "| E cols with no area_code:", sum(is.na(e_area)), "\n")
+cat("[20] national land rows matched:", length(.nat_hit), "/", length(nat_lu), "\n")
 
 # municipal soy land (ha): soybean process = c021, key "co_mun_c021" = harvested soy area.
 # NB: use area_harv (sum ~37 Mha, matches IBGE); SOY_MUN$area_plant actually holds production
@@ -173,19 +179,16 @@ prod_group_sel <- list("dairy" = c("c110", "c111"),
                        "meat-dairy-eggs" = c("c110", "c111", "c112", "c114", "c115", "c116", "c117", "c118"))
 prod_sel <- c(prod_sel, prod_group_sel)
 
-PA_prod_country <- # lapply(c("mass", "value"), function(alloc){
+PA_prod_country <-
   sapply(names(prod_sel), function(prod_nm){
     prod <- prod_sel[[prod_nm]]
     YA_prod_country <- YA_country
-    YA_prod_country[!grepl(paste(prod,collapse="|"), rownames(YA_prod_country)),] <- 0 
+    YA_prod_country[!grepl(paste(prod,collapse="|"), rownames(YA_prod_country)),] <- 0
     colnames(YA_prod_country) <- paste0(colnames(YA_prod_country),"_",prod_nm)
     PA_mass_prod_country <- LA_mass  %*% YA_prod_country
     PA_value_prod_country <- LA_value  %*% YA_prod_country
-    #FA_mass_prod_country  <- l*PA_mass_prod_country
-    #FA_value_prod_country <- l*PA_value_prod_country
     return(list(mass = PA_mass_prod_country, value = PA_value_prod_country))
   }, USE.NAMES = TRUE, simplify = FALSE)
-#})
 
 PA_prod_country <- sapply(c("mass", "value"), function(alloc){
   do.call("cbind", lapply(PA_prod_country, function(x) x[[alloc]]))

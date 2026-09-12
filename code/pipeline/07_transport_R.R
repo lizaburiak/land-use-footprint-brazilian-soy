@@ -24,7 +24,7 @@ MUN_capital_dist <- readRDS(paste0("data/generated/outputs/00_", YEAR, "/MUN_cap
 # few extras that get filtered out by step 05; transport package requires dim match).
 .mun <- as.character(SOY_MUN$co_mun)
 # Drop non-geographic placeholder municipalities (e.g. COMEX code 9300000,
-# "unknown municipality") that have no entry in the distance matrix — they
+# "unknown municipality") that have no entry in the distance matrix - they
 # cannot be transport nodes. Keep SOY_MUN and the cost matrix aligned.
 .in_dist <- .mun %in% rownames(MUN_capital_dist)
 if (any(!.in_dist)) {
@@ -47,12 +47,12 @@ flows <- lapply(dist, function(d){
 
   MUN_transport <- sapply(product, function(x){
     # transport() with full-length a/b returns from/to indices into the FULL a/b vectors
-    # (1..nrow(SOY_MUN)). Stefan's original `suppliers[sol$from]` was a bug — `suppliers`
+    # (1..nrow(SOY_MUN)). Stefan's original `suppliers[sol$from]` was a bug - `suppliers`
     # is a filtered subset (positive supply only), so indices > length(suppliers) returned NA.
     # Map directly through SOY_MUN$co_mun instead.
     a <- pull(SOY_MUN, paste0("excess_supply_", x))
     b <- pull(SOY_MUN, paste0("excess_use_", x))
-    a[is.na(a)] <- 0; b[is.na(b)] <- 0   # defensive: NA excess = no excess
+    a[is.na(a)] <- 0; b[is.na(b)] <- 0   # NA excess = no excess
     .empty <- data.frame(co_orig = numeric(0), co_dest = numeric(0),
                          product = character(0), value = numeric(0))
     # Some products have no inter-municipal flow in a given year (e.g. oil fully

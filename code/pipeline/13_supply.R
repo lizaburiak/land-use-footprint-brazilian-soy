@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("data/fabio/v2/inst")) == 0) {
@@ -21,8 +11,6 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 ### supply table ###
 
@@ -42,7 +30,15 @@ items <- fread("data/fabio/v2/inst/items_full.csv")
 
 # Supply ------------------------------------------------------------------
 
-btd <- readRDS("data/fabio/v2/btd_full.rds")
+# PRE-2010: v2's btd_full starts in 2010 (the v2 build is data-2010-current); the
+# v1.1 build (data/fabio/v1.1/, fetched from /mnt/nfs_fineprint/tmp/fabio/v1.1/)
+# covers 1986-2019 with the same 10-column schema and units already in 'head'.
+# Downstream merges key on FAO item_code, which is stable across v1.1/v2
+# (comm_codes are NOT -- they are offset between versions).
+# SOYPRINT_FORCE_V11=1 forces the v1.1 path on 2010+ years (vintage cross-checks).
+.use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
+btd <- readRDS(if (.use_v11) "data/fabio/v1.1/btd_full.rds" else
+                 "data/fabio/v2/btd_full.rds")
 # v2 PORT: FABIO v2 labels animal trade as 'An' / '1000 An'; Stefan's v1.1 code
 # expects a 'head' unit (used in the price = usd/head logic below). Normalise:
 # fold '1000 An' into 'An' (x1000), then rename 'An' -> 'head'.
@@ -212,21 +208,6 @@ sup <- merge(sup, all.x = TRUE,
   by = c("area_code", "year"))
 sup[, `:=`(price = ifelse(item == "Palm kernels", price_oil * 0.6, price),
   price_oil = NULL)]
-
-# # fill missing prices for oils and cakes with global averages
-# price_oil <- prices[grepl(" Oil", item),
-#   list(price_oil = na_sum(usd) / na_sum(tonnes)),
-#   by = list(year)]
-# price_oil <- merge(price_oil, all.x = TRUE,
-#   prices[grepl("Cake", item),
-#   list(price_cake = na_sum(usd) / na_sum(tonnes)),
-#   by = list(year)],
-#   by = "year")
-# sup <- merge(sup, all.x = TRUE,
-#   price_oil[, .(year, price_oil, price_cake)],
-#   by = "year")
-# sup[grepl("Cake", item), `:=`(price = ifelse(is.na(price), price_cake, price))]
-# sup[grepl(" Oil", item), `:=`(price = ifelse(is.na(price), price_oil, price))]
 
 # fill in milk prices
 # v2 PORT: v1.1's prices_tidy split milk by species ("...cow"/"...buffalo"/...), so the

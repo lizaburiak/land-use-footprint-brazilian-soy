@@ -1,0 +1,7 @@
+run_footprints  start=Wed  1 Jul 2026 16:07:36 CEST  years=2015..2015
+----------------------------------------
+YEAR 2015: COMPLETE (13-20; footprints written, non-zero)
+================== SUMMARY ==================
+NOTE: step 21 (30m MapBiomas grid maps) skipped for ALL years -- blocked on
+      MapBiomas tiles + R pkgs fasterize/gdalUtilities/rasterVis.
+done=Wed  1 Jul 2026 16:37:24 CEST

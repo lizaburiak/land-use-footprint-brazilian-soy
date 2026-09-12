@@ -1,7 +1,7 @@
 # ============================================================================
 # Per-municipality soy LAND-use footprint (ha, F_mass) for ALL years, by layer
 #   Total | China | EU-27 | Rest of Asia | Rest of world
-# -> tidy CSV consumed by code/animate_footprint.py to build year-by-year GIFs.
+# -> tidy CSV consumed by prep_map_merge_pre2010.R (2001-2022 map data).
 # Same extraction as prep_map_2010_2022.R, looped over every available year.
 # Usage: Rscript code/prep/prep_map_allyears.R   (auto-detects years with F_mass)
 # ============================================================================

@@ -1,7 +1,7 @@
 
 ######## Estimation of MU livestock numbers by production system #########
 #
-# YEAR-DEPENDENCE — two caveats for the multi-year extension:
+# YEAR-DEPENDENCE - two caveats for the multi-year extension:
 #  (A) Production-SYSTEM SHARES (pig ext/int/ind, chicken, cattle grassland/mixed)
 #      are derived from the 2010 GLW3 / Gilbert-et-al-2015 rasters and the static
 #      GLPS map, then applied to each YEAR's IBGE headcounts. Only the *totals* move
@@ -10,7 +10,7 @@
 #      annual gridded-livestock dataset give totals but no ext/int/ind split), so
 #      this is a stated methodological limitation, not a fixable input.
 #  (B) FEEDLOT cattle: the 2006 IBGE census municipal pattern is scaled to YEAR by
-#      the national ABIEC confinement series (see the feedlot block below) — no
+#      the national ABIEC confinement series (see the feedlot block below) - no
 #      longer frozen at the 2013 growth factor.
 
 library(raster)
@@ -21,6 +21,7 @@ library(tidyr)
 library(openxlsx)
 library(mapview)
 library(leafsync)
+source("code/pipeline/00_checks.R")
 
 # Year parameter (default 2013)
 args <- commandArgs(trailingOnly = TRUE)
@@ -127,6 +128,23 @@ GEO_MUN_SOY <- GEO_MUN_SOY %>% group_by(co_state) %>%
           ChExtShare = if_else(is.na(ChExtShare), mean(ChExtShare, na.rm=TRUE), ChExtShare),
           ChIntShare = if_else(is.na(ChIntShare), mean(ChIntShare, na.rm=TRUE), ChIntShare)) %>% ungroup()
 
+# SENSITIVITY: replace the (frozen-2010) within-state municipal system shares with
+# headcount-weighted STATE-composition shares - every municipality in a state gets
+# the same system split. Bounds the "municipal composition frozen at 2010" weakness.
+# MC_FEED_SHARES=state_avg activates it (default unset = keep municipal shares).
+if (tolower(Sys.getenv("MC_FEED_SHARES", "")) == "state_avg") {
+  GEO_MUN_SOY <- GEO_MUN_SOY %>% group_by(co_state) %>%
+    mutate(.pg = sum(PgExt + PgInt + PgInd, na.rm = TRUE),
+           PgExtShare = sum(PgExt, na.rm = TRUE) / .pg,
+           PgIntShare = sum(PgInt, na.rm = TRUE) / .pg,
+           PgIndShare = sum(PgInd, na.rm = TRUE) / .pg,
+           .ch = sum(ChExt + ChInt, na.rm = TRUE),
+           ChExtShare = sum(ChExt, na.rm = TRUE) / .ch,
+           ChIntShare = sum(ChInt, na.rm = TRUE) / .ch) %>%
+    dplyr::select(-.pg, -.ch) %>% ungroup()
+  message("[02] SENSITIVITY MC_FEED_SHARES=state_avg applied to pig/chicken system shares")
+}
+
 
 ## apply 2010-derived system shares to YEAR headcounts to obtain pig and chicken numbers by system
 GEO_MUN_SOY <- GEO_MUN_SOY %>% mutate(pig_byd = pig*PgExtShare,
@@ -191,11 +209,21 @@ GEO_MUN_SOY <- GEO_MUN_SOY %>% group_by(co_state) %>%
   mutate(CattGrassShare = if_else(is.na(CattGrassShare), mean(CattGrassShare, na.rm=TRUE), CattGrassShare),
          CattMixShare = if_else(is.na(CattMixShare), mean(CattMixShare, na.rm=TRUE), CattMixShare)) %>% ungroup()
 
+# SENSITIVITY (see MC_FEED_SHARES note above): state-composition cattle shares.
+if (tolower(Sys.getenv("MC_FEED_SHARES", "")) == "state_avg") {
+  GEO_MUN_SOY <- GEO_MUN_SOY %>% group_by(co_state) %>%
+    mutate(.ct = sum(CattGrass + CattMix, na.rm = TRUE),
+           CattGrassShare = sum(CattGrass, na.rm = TRUE) / .ct,
+           CattMixShare   = sum(CattMix,   na.rm = TRUE) / .ct) %>%
+    dplyr::select(-.ct) %>% ungroup()
+  message("[02] SENSITIVITY MC_FEED_SHARES=state_avg applied to cattle system shares")
+}
+
 
 ## include feedlot cattle numbers from the IBGE 2006 census, scaled to YEAR.
 ## The 2006 census provides the *municipal distribution* of feedlot cattle; we scale
 ## the national total to YEAR by the ABIEC/Athenagro confinement series (below).
-## LIMITATION: the 2006 municipal *pattern* is held fixed — only the national total
+## LIMITATION: the 2006 municipal *pattern* is held fixed - only the national total
 ## moves with YEAR. The 2006 census (SIDRA tabela 919) is the ONLY municipal
 ## confined-cattle source: the 2017 Censo Agropecuário dropped the confinement
 ## question (no 2017 municipal feedlot table exists), so national scaling is the
@@ -209,7 +237,7 @@ sum(feedlot$cattle_tot, na.rm = TRUE)
 sum(SOY_MUN$cattle)# much more because the census data considers only farms with >50 animals
 
 # National confined-cattle totals (million head), ABIEC/Athenagro "Bovinos Confinados"
-# series, Beef Report 2023 (abiec.com.br) — the same source as the original 2006/2013
+# series, Beef Report 2023 (abiec.com.br) - the same source as the original 2006/2013
 # anchors. Values for unlabeled chart years are read from the bar chart (~±0.1 M);
 # 2006, 2013, 2021 and 2022 are confirmed. Refine against exact ABIEC data if needed.
 .confined_Mhead <- c(`2006`=3.46, `2007`=3.90, `2008`=4.05, `2009`=3.35, `2010`=3.05,
@@ -297,11 +325,18 @@ GEO_MUN_SOY <- GEO_MUN_SOY %>% mutate(# dairy buffaloes
 
 # check and merge results ---------------------------------------------------------------------------------------------------
 
-# check validity of results
-all.equal(GEO_MUN_SOY$pig, GEO_MUN_SOY$pig_byd + GEO_MUN_SOY$pig_int + GEO_MUN_SOY$pig_ind)
-all.equal(GEO_MUN_SOY$chicken, GEO_MUN_SOY$chicken_byd + GEO_MUN_SOY$chicken_lay + GEO_MUN_SOY$chicken_bro)
-all.equal(GEO_MUN_SOY$cattle, GEO_MUN_SOY$cattle_gra_meat + GEO_MUN_SOY$cattle_gra_dair + GEO_MUN_SOY$cattle_mix_meat + GEO_MUN_SOY$cattle_mix_dair + GEO_MUN_SOY$cattle_flot)
-all.equal(GEO_MUN_SOY$buffalo, GEO_MUN_SOY$buffalo_gra_meat + GEO_MUN_SOY$buffalo_gra_dair + GEO_MUN_SOY$buffalo_mix_meat + GEO_MUN_SOY$buffalo_mix_dair)
+# check validity of results: each species' subsystems must partition its herd.
+# warn_only: municipalities with missing IBGE inputs (e.g. NA layer counts)
+# put NAs on the split side, which is a data gap, not a broken split - warn
+# loudly instead of killing the run (see the negative-herd guard below).
+assert_equal(GEO_MUN_SOY$pig, GEO_MUN_SOY$pig_byd + GEO_MUN_SOY$pig_int + GEO_MUN_SOY$pig_ind,
+             "02 pig systems partition herd", warn_only = TRUE)
+assert_equal(GEO_MUN_SOY$chicken, GEO_MUN_SOY$chicken_byd + GEO_MUN_SOY$chicken_lay + GEO_MUN_SOY$chicken_bro,
+             "02 chicken systems partition herd", warn_only = TRUE)
+assert_equal(GEO_MUN_SOY$cattle, GEO_MUN_SOY$cattle_gra_meat + GEO_MUN_SOY$cattle_gra_dair + GEO_MUN_SOY$cattle_mix_meat + GEO_MUN_SOY$cattle_mix_dair + GEO_MUN_SOY$cattle_flot,
+             "02 cattle systems partition herd", warn_only = TRUE)
+assert_equal(GEO_MUN_SOY$buffalo, GEO_MUN_SOY$buffalo_gra_meat + GEO_MUN_SOY$buffalo_gra_dair + GEO_MUN_SOY$buffalo_mix_meat + GEO_MUN_SOY$buffalo_mix_dair,
+             "02 buffalo systems partition herd", warn_only = TRUE)
 
 # GUARD (2026-07): no production-system herd may be negative. Broilers were the
 # systematic offender (empty total-chicken column, now floored above); cattle_meat

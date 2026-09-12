@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("data/fabio/v2/inst")) == 0) {
@@ -21,8 +11,6 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 ### MRIO ###
 
@@ -31,6 +19,7 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
 # - re-balancing changed to use character indexing and (optionally) to re-balance according to cbs production values
 
 library(Matrix)
+source("code/pipeline/00_checks.R")
 
 write = TRUE
 
@@ -40,9 +29,9 @@ mr_sup_m <- readRDS("data/generated/fabio/mr_sup_mass.rds")
 mr_sup_v <- readRDS("data/generated/fabio/mr_sup_value.rds")
 mr_use <- readRDS("data/generated/fabio/mr_use.rds")
 
-# check for conformity
-all.equal(rownames(mr_sup_m[[as.character(YEAR)]]), colnames(mr_use[[as.character(YEAR)]]))
-all.equal(colnames(mr_sup_m[[as.character(YEAR)]]), rownames(mr_use[[as.character(YEAR)]]))
+# check for conformity (halt on mismatch)
+stopifnot(identical(rownames(mr_sup_m[[as.character(YEAR)]]), colnames(mr_use[[as.character(YEAR)]])),
+          identical(colnames(mr_sup_m[[as.character(YEAR)]]), rownames(mr_use[[as.character(YEAR)]])))
 
 # Mass
 trans_m <- lapply(mr_sup_m, function(sup) {
@@ -189,34 +178,4 @@ if (write){
 }
 
 
-
-# # redistribute balancing over all uses proportionally ---------------------------------------------
-# ###### NOT NEEDED ######
-# 
-# regions <- fread("data/fabio/v2/inst/regions_full.csv")
-# regions <- regions[cbs==TRUE]
-# items <- fread("data/fabio/v2/inst/items_full.csv")
-# nrcom <- nrow(items)
-# nrreg <- nrow(regions)
-# nrfd <- ncol(Y[[1]])/nrreg
-# i=28
-# for(i in seq_along(Z_m)){
-#   reg=1
-#   for(reg in seq_len(nrow(regions))){
-#     z_range <- (nrcom*(reg-1)+1):(nrcom*reg)
-#     y_range <- (nrfd*(reg-1)+1):(nrfd*reg)
-#     Z_sum <- rowSums(Z_m[[i]][, z_range])
-#     Y_sum <- rowSums(Y[[i]][, y_range])
-#     balancing <- as.vector(Y[[i]][, grepl("balancing", colnames(Y[[i]]))][, reg])
-#     balancing <- balancing / as.vector(Z_sum + Y_sum - balancing)
-#     balancing[!is.finite(balancing)] <- 0
-#     Z_m[[i]][, z_range] <- Z_m[[i]][, z_range] * (1 + balancing)
-#     Z_v[[i]][, z_range] <- Z_v[[i]][, z_range] * (1 + balancing)
-#     Y[[i]][, y_range] <- Y[[i]][, y_range] * (1 + balancing)
-#   }
-# }
-
-#saveRDS(Z_m, "/mnt/nfs_fineprint/tmp/fabio/v2/Z_mass_b.rds")
-#saveRDS(Z_v, "/mnt/nfs_fineprint/tmp/fabio/v2/Z_value_b.rds")
-#saveRDS(Y, "/mnt/nfs_fineprint/tmp/fabio/v2/Y_b.rds")
 

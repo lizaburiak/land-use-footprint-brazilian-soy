@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run the FULL reproduction pipeline (steps 00 -> 21) for a single year.
 #
-#   Core model (00-12, Euclidean transport): fatal — stops the year on failure.
-#   FABIO MRIO + footprints (13-21):          soft — they stop at a guard when the
+#   Core model (00-12, Euclidean transport): fatal - stops the year on failure.
+#   FABIO MRIO + footprints (13-21):          soft - they stop at a guard when the
 #                                             FABIO/EXIOBASE data is absent; recorded
 #                                             and skipped, not treated as a failure.
 #

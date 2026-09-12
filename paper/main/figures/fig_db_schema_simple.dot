@@ -1,0 +1,154 @@
+digraph soyprint_db {
+  graph [rankdir=LR, splines=spline, nodesep=0.35, ranksep=0.9, newrank=true, compound=true, fontname="Helvetica", fontsize=11, labelloc=t, label="SOYPRINT database (soyprint.duckdb). Fact tables cover 2000–2022 and are hive-partitioned by year in the Parquet layer."];
+  node [shape=plain, fontname="Helvetica", fontsize=9];
+  edge [color="#31538f", penwidth=0.9, dir=both, arrowtail=crowodot, arrowhead=teetee, arrowsize=0.7];
+  subgraph cluster_0 {
+    label="Dimensions"; fontsize=11; fontcolor="#31538f"; color="#31538f"; style=dashed; margin=10;
+  dim_municipality [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_municipality</B>  <FONT POINT-SIZE="8" COLOR="#555555">5,572 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT">nm_mun</TD></TR>
+    <TR><TD ALIGN="LEFT">co_state</TD></TR>
+    <TR><TD ALIGN="LEFT">nm_state</TD></TR>
+    <TR><TD ALIGN="LEFT">lon</TD></TR>
+    <TR><TD ALIGN="LEFT">lat</TD></TR>
+    <TR><TD ALIGN="LEFT">biome</TD></TR>
+    <TR><TD ALIGN="LEFT">matopiba</TD></TR>
+    </TABLE>>];
+  dim_soy_product [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_soy_product</B>  <FONT POINT-SIZE="8" COLOR="#555555">3 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product</B></TD></TR>
+    <TR><TD ALIGN="LEFT">hs4</TD></TR>
+    <TR><TD ALIGN="LEFT">fabio_item_code</TD></TR>
+    <TR><TD ALIGN="LEFT">description</TD></TR>
+    </TABLE>>];
+  dim_commodity [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_commodity</B>  <FONT POINT-SIZE="8" COLOR="#555555">140 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>comm_code</B></TD></TR>
+    <TR><TD ALIGN="LEFT">item_code</TD></TR>
+    <TR><TD ALIGN="LEFT">item</TD></TR>
+    <TR><TD ALIGN="LEFT">comm_group</TD></TR>
+    <TR><TD ALIGN="LEFT">group</TD></TR>
+    <TR><TD ALIGN="LEFT">enduse_bucket</TD></TR>
+    </TABLE>>];
+  dim_country [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_country</B>  <FONT POINT-SIZE="8" COLOR="#555555">267 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>iso3c</B></TD></TR>
+    <TR><TD ALIGN="LEFT">name</TD></TR>
+    <TR><TD ALIGN="LEFT">continent</TD></TR>
+    <TR><TD ALIGN="LEFT">region</TD></TR>
+    <TR><TD ALIGN="LEFT">eu27</TD></TR>
+    </TABLE>>];
+  }
+  subgraph cluster_1 {
+    label="Supply, use & trade (pipeline step 05)"; fontsize=11; fontcolor="#3d7337"; color="#3d7337"; style=dashed; margin=10;
+  production [color="#3d7337", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dcebd7" ALIGN="LEFT"><B>production</B>  <FONT POINT-SIZE="8" COLOR="#555555">127,898 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT">area_planted_ha</TD></TR>
+    <TR><TD ALIGN="LEFT">area_harvested_ha</TD></TR>
+    <TR><TD ALIGN="LEFT">production_bean_t</TD></TR>
+    <TR><TD ALIGN="LEFT">processed_bean_t</TD></TR>
+    <TR><TD ALIGN="LEFT">production_oil_t</TD></TR>
+    <TR><TD ALIGN="LEFT">production_cake_t</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  domestic_use [color="#3d7337", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dcebd7" ALIGN="LEFT"><B>domestic_use</B>  <FONT POINT-SIZE="8" COLOR="#555555">545,446 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>use_category</B></TD></TR>
+    <TR><TD ALIGN="LEFT">tonnes</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  trade [color="#3d7337", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#dcebd7" ALIGN="LEFT"><B>trade</B>  <FONT POINT-SIZE="8" COLOR="#555555">45,345 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>flow</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>partner_iso3</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>hs4</B></TD></TR>
+    <TR><TD ALIGN="LEFT">tonnes</TD></TR>
+    <TR><TD ALIGN="LEFT">value_usd</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  }
+  subgraph cluster_2 {
+    label="Transport & export attribution (step 08)"; fontsize=11; fontcolor="#b26a12"; color="#b26a12"; style=dashed; margin=10;
+  export_attribution [color="#b26a12", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#fbe5c9" ALIGN="LEFT"><B>export_attribution</B>  <FONT POINT-SIZE="8" COLOR="#555555">1,933,070 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>method</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>dest_iso3</B></TD></TR>
+    <TR><TD ALIGN="LEFT">tonnes</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  transport_flows [color="#b26a12", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#fbe5c9" ALIGN="LEFT"><B>transport_flows</B>  <FONT POINT-SIZE="8" COLOR="#555555">786,759 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>method</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun_orig</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun_dest</B></TD></TR>
+    <TR><TD ALIGN="LEFT">tonnes</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  }
+  subgraph cluster_3 {
+    label="Consumption footprints (step 20)"; fontsize=11; fontcolor="#a03232"; color="#a03232"; style=dashed; margin=10;
+  footprint_country [color="#a03232", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#f4d7d7" ALIGN="LEFT"><B>footprint_country</B>  <FONT POINT-SIZE="8" COLOR="#555555">10,548,217 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>consumer_code</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>demand</B></TD></TR>
+    <TR><TD ALIGN="LEFT">hectares</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  footprint_product [color="#a03232", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#f4d7d7" ALIGN="LEFT"><B>footprint_product</B>  <FONT POINT-SIZE="8" COLOR="#555555">9,078,085 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product_family</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>product_code</B></TD></TR>
+    <TR><TD ALIGN="LEFT">hectares</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  footprint_animal_country [color="#a03232", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="1" BGCOLOR="#f4d7d7" ALIGN="LEFT"><B>footprint_animal_country</B>  <FONT POINT-SIZE="8" COLOR="#555555">46,980,442 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>co_mun</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>consumer_iso3</B></TD></TR>
+    <TR><TD ALIGN="LEFT"><B>item</B></TD></TR>
+    <TR><TD ALIGN="LEFT">hectares</TD></TR>
+    <TR><TD ALIGN="LEFT"><B>year</B></TD></TR>
+    </TABLE>>];
+  }
+  production -> dim_municipality;
+  domestic_use -> dim_municipality;
+  domestic_use -> dim_soy_product;
+  trade -> dim_municipality;
+  trade -> dim_soy_product;
+  trade -> dim_country;
+  export_attribution -> dim_municipality;
+  export_attribution -> dim_soy_product;
+  export_attribution -> dim_country;
+  transport_flows -> dim_municipality;
+  transport_flows -> dim_soy_product;
+  dim_municipality -> footprint_country [arrowtail=teetee, arrowhead=crowodot];
+  dim_country -> footprint_country [arrowtail=teetee, arrowhead=crowodot];
+  dim_municipality -> footprint_product [arrowtail=teetee, arrowhead=crowodot];
+  dim_commodity -> footprint_product [arrowtail=teetee, arrowhead=crowodot];
+  dim_municipality -> footprint_animal_country [arrowtail=teetee, arrowhead=crowodot];
+  dim_country -> footprint_animal_country [arrowtail=teetee, arrowhead=crowodot];
+  production -> transport_flows [style=invis];
+}

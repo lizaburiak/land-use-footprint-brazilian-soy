@@ -83,7 +83,9 @@ Needed for the footprint steps (13–21) and transport; obtain separately.
 | Dataset | Source | Save to |
 |---|---|---|
 | FABIO bilateral trade (1986–2013 prebuilt) | https://doi.org/10.5281/zenodo.2577066 | `data/fabio/trade/` |
-| FABIO v2 backend | fineprint-global / WU | `data/fabio/v2/` |
+| FABIO v2 backend (2010–2023) | fineprint-global / WU | `data/fabio/v2/` |
+| FABIO v1.1 backend for pre-2010 years (`btd_full` 1986–2019, `E` 1986–2013, `optim_results` 1961–2019, tidy files, label CSVs) | WU server `/mnt/nfs_fineprint/tmp/fabio/v1.1/` — steps 12/13/14/20 switch to it for `YEAR < 2010` | `data/fabio/v1.1/` |
+| FABIO pre-2010 staging (Stefan's 1986–2013 snapshots, for the 2000–2009 extension) | copies of `data/fabio/trade/` files — see its `README.md` for the v1.1 gap-closure notes | `data/fabio_before_2010/` |
 | EXIOBASE 3 (pxp) | https://www.exiobase.eu/ | `data/exiobase/pxp/` |
 | Trase composite benchmark | https://trase.earth/ | `data/trase/` |
 | Spatial layers (GADM, OSM roads, DNIT waterways, ANTAQ ports, ANTT rail, IBGE biomes, MapBiomas soy tiles) | see `STRUCTURE.md` | `data/geo/` |

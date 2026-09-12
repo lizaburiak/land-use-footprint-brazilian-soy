@@ -15,10 +15,11 @@ library(tidyr)
 library(abind)
 library(Matrix)
 # Note: Stefan's original loaded Matrix.utils (removed from CRAN in 2022).
-# It was never actually called in this script — sparse-matrix ops use the base
+# It was never actually called in this script - sparse-matrix ops use the base
 # Matrix package directly.
 library(purrr)
 library(parallel)
+source("code/pipeline/00_checks.R")
 
 write = TRUE
 
@@ -28,6 +29,12 @@ bs_res_dir <- paste0("./data/generated/outputs/gams/bs_res_", YEAR)
 
 flows_euclid <- readRDS(paste0("data/generated/outputs/07_", YEAR, "/flows_euclid.rds"))
 bs_files <- if (dir.exists(bs_res_dir)) list.files(bs_res_dir, pattern="*.rds", full.names=F) else character(0)
+# SENSITIVITY: force Euclidean-only (ignore any pre-computed GAMS bootstrap flows
+# on disk). The input-sensitivity screen (code/analysis/sens_inputs.sh) perturbs
+# municipal supply; the stored bootstrap flows were built against the unperturbed
+# supply, so mixing them in breaks the conservation checks below. The screen
+# tracks the euclid path only. No-op for normal runs (env unset).
+if (nzchar(Sys.getenv("SENS_EUCLID_ONLY"))) bs_files <- character(0)
 has_bootstrap <- length(bs_files) > 0
 if (has_bootstrap) {
   flows_bs <- lapply(bs_files, function(file){
@@ -37,7 +44,7 @@ if (has_bootstrap) {
   flows <- c(flows_euclid, flows_bs)
   rm(flows_bs)
 } else {
-  message("No GAMS bootstrap files at ", bs_res_dir, " — running Euclidean-only.")
+  message("No GAMS bootstrap files at ", bs_res_dir, " - running Euclidean-only.")
   flows <- flows_euclid
 }
 
@@ -108,14 +115,20 @@ system.time(
       diag(mat) <- as.numeric(pull(SOY_MUN, paste0("total_supply_",x)) - pull(SOY_MUN, paste0("excess_supply_",x)))
       return(as(mat, "Matrix"))}, USE.NAMES = TRUE, simplify = FALSE)
 
+    # tolerance 2e-3: step 07 rescales the larger transport margin by up to
+    # ~0.1% to balance the problem after dropping non-geographic nodes
     lapply(product, function(x){
-      all.equal(rowSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_supply_",x), name = "co_mun"))
-      all.equal(colSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_use_",x), name = "co_mun"))
+      assert_equal(rowSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_supply_",x), name = "co_mun"),
+                   paste0("08 flow matrix rows = total supply, ", x), tolerance = 2e-3)
+      assert_equal(colSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_use_",x), name = "co_mun"),
+                   paste0("08 flow matrix cols = total use, ", x), tolerance = 2e-3)
       })
 
     lapply(product, function(x){
-      all.equal(rowSums(flow_wide[[x]]), pull(SOY_MUN, paste0("excess_supply_",x), name = "co_mun"))
-      all.equal(colSums(flow_wide[[x]]), pull(SOY_MUN, paste0("excess_use_",x), name = "co_mun"))
+      assert_equal(rowSums(flow_wide[[x]]), pull(SOY_MUN, paste0("excess_supply_",x), name = "co_mun"),
+                   paste0("08 flow rows = municipal surpluses, ", x), tolerance = 2e-3)
+      assert_equal(colSums(flow_wide[[x]]), pull(SOY_MUN, paste0("excess_use_",x), name = "co_mun"),
+                   paste0("08 flow cols = municipal deficits, ", x), tolerance = 2e-3)
     })
 
     flow_long_full <- bind_rows(lapply(product, function(x){
@@ -139,11 +152,14 @@ mu_to_mu_dt <- reduce(mu_to_mu, merge, by = c("co_orig", "co_dest", "product"), 
 mu_to_mu_dt[is.na(mu_to_mu_dt)] <- 0
 
 if (has_bootstrap) {
-  mu_to_mu_bs <- mu_to_mu_dt[,which(colnames(mu_to_mu_dt) == "00001"):ncol(mu_to_mu_dt)] %>% as.matrix() %>% as("sparseMatrix")
+  # bootstrap columns are the ones named after the bs files (Stefan hardcoded
+  # "00001", but a central-only run starts at "00000")
+  .bs_cols <- intersect(gsub("\\.rds$", "", bs_files), colnames(mu_to_mu_dt))
+  mu_to_mu_bs <- mu_to_mu_dt[, .bs_cols, with = FALSE] %>% as.matrix() %>% as("sparseMatrix")
   mu_to_mu_dt <- dplyr::select(mu_to_mu_dt, c(co_orig:euclid))
   mu_to_mu_dt <- mu_to_mu_dt %>% mutate(mean = rowSums(mu_to_mu_bs)/ncol(mu_to_mu_bs))
 } else {
-  # No bootstrap → "mean" collapses to the euclidean flow itself
+  # No bootstrap -> "mean" collapses to the euclidean flow itself
   mu_to_mu_dt <- mu_to_mu_dt %>% mutate(mean = euclid)
 }
 
@@ -168,12 +184,8 @@ system.time(
     }, USE.NAMES = TRUE, simplify = FALSE)
 
 
-    lapply(product, function(x){
-      # isTRUE() guard: all.equal returns a character message on mismatch, which
-      # `&` cannot combine. Wrap so an imbalance produces FALSE instead of crashing.
-      isTRUE(all.equal(rowSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_supply_",x), name = "co_mun"))) &
-      isTRUE(all.equal(colSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_use_",x), name = "co_mun")))
-    })
+    # (duplicate margin check removed - the same margins are hard-asserted
+    # right after flow_wide_full is built above)
 
     flow_wide_rel <- lapply(flow_wide_full,
                             function(x){
@@ -186,7 +198,10 @@ system.time(
       flow_wide_rel[[x]] %*% exp_wide[[x]]},
       USE.NAMES = TRUE, simplify = FALSE)
 
-    Map(function(x,y){all.equal(sum(x),sum(y))}, source_to_export, exp_wide)
+    Map(function(x, y, nm) assert_equal(sum(x), sum(y),
+          paste0("08 origin-attributed exports preserve export totals, ", nm),
+          tolerance = 2e-3),
+        source_to_export, exp_wide, names(source_to_export))
 
     dom_share <- sapply(product, function(x){
       # Own-production (domestic-origin) share. Written as (total_supply - imports) instead

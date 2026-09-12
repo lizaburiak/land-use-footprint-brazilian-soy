@@ -1,6 +1,6 @@
 
 ###############################################################################
-# SCRIPT 00: Data Preparation — Municipality-Level Soy Supply Chain Dataset
+# SCRIPT 00: Data Preparation - Municipality-Level Soy Supply Chain Dataset
 ###############################################################################
 #
 # PURPOSE:
@@ -19,9 +19,9 @@
 #   or set YEAR manually below and source() in RStudio
 #
 # INPUT DATA (all from data/raw/00/):
-#   ┌─────────────────────────────┬──────────────────┬────────────────────────┐
+#   ┌-----------------------------┬------------------┬------------------------┐
 #   │ Data                        │ Years available   │ Selection method       │
-#   ├─────────────────────────────┼──────────────────┼────────────────────────┤
+#   ├-----------------------------┼------------------┼------------------------┤
 #   │ IBGE municipality codes     │ 15 snapshots      │ lower bound            │
 #   │ COMEX exports & imports     │ 2000-2025 yearly  │ exact year             │
 #   │ COMEX lookup tables         │ current           │ static                 │
@@ -36,7 +36,7 @@
 #   │ Municipality boundaries     │ 15 snapshots      │ lower bound            │
 #   │ Municipality capitals       │ 2010 shapefile    │ static                 │
 #   │ FAO CBS (used in script 00_FAO) │ 2000-2023     │ exact year             │
-#   └─────────────────────────────┴──────────────────┴────────────────────────┘
+#   └-----------------------------┴------------------┴------------------------┘
 #
 # OUTPUT (to data/generated/outputs/00_{YEAR}/):
 #   - SOY_MUN_00.rds      : main municipality table (~5570 rows × 39 columns)
@@ -70,7 +70,7 @@ if (length(args) > 0) {
 } else {
   YEAR <- 2013
 }
-stopifnot(YEAR >= 2000 & YEAR <= 2022)  # analysis window 2000–2022
+stopifnot(YEAR >= 2000 & YEAR <= 2023)  # inputs window 2000–2023 (analysis 2000–2022)
 
 write <- TRUE
 cat("============================================================\n")
@@ -128,7 +128,7 @@ find_year_file <- function(pattern, target, available_years = NULL) {
 
 cat("Loading data for year", YEAR, "...\n")
 
-# ── 1.1 Municipality master list (IBGE) ──────────────────────────────────────
+# -- 1.1 Municipality master list (IBGE) --------------------------------------
 # Contains: co_mun (7-digit IBGE code), nm_mun (uppercase name),
 #           co_state (2-digit state code), nm_state (2-letter abbreviation)
 # Available years: 2000,2001,2005,2007,2010,2013-2022 (from geobr)
@@ -137,7 +137,7 @@ mun_info <- find_year_file(
 MUN <- openxlsx::read.xlsx(mun_info$file)
 cat("  Municipality codes:", nrow(MUN), "from year", mun_info$year, "\n")
 
-# ── 1.2 COMEX international trade (MDIC) ─────────────────────────────────────
+# -- 1.2 COMEX international trade (MDIC) -------------------------------------
 # Monthly municipality-level exports and imports, all products.
 # Semicolon-separated CSV, one file per year. Available: 2000-2025.
 # We filter for soy HS4 codes later: 1201 (beans), 1507 (oil), 2304 (cake).
@@ -148,7 +148,7 @@ IMP_MUN <- read.csv2(
   file = paste0("data/raw/00/COMEX_imports/IMP_", YEAR, "_MUN_COMEX.csv"),
   header = TRUE, stringsAsFactors = FALSE)
 
-# Lookup tables for COMEX municipality codes → names and country codes → names
+# Lookup tables for COMEX municipality codes -> names and country codes -> names
 # These are static (backward-compatible across all years).
 COMEX_MUN <- read.csv2(
   file = "data/raw/00/COMEX_codes/UF_MUN_COMEX.csv",
@@ -157,7 +157,7 @@ PAIS <- read.csv2(
   file = "data/raw/00/COMEX_codes/PAIS_COMEX.csv",
   header = TRUE, fileEncoding = "ISO-8859-1")
 
-# ── 1.3 Soy production (IBGE PAM, Table 1612) ───────────────────────────────
+# -- 1.3 Soy production (IBGE PAM, Table 1612) -------------------------------
 # Area planted, area harvested, production quantity by municipality.
 # Available: 2000-2024 yearly. CSV with 2 header rows (skip=2).
 prod_info <- find_year_file(
@@ -166,18 +166,18 @@ PROD_MUN <- read.csv(
   file = prod_info$file, header = TRUE, skip = 2,
   encoding = "UTF-8", stringsAsFactors = FALSE)
 
-# ── 1.4 Processing/crushing facilities (ABIOVE) ──────────────────────────────
+# -- 1.4 Processing/crushing facilities (ABIOVE) ------------------------------
 # NEW METHOD (replaces FINAL_municipality_level_2000_2023.csv approach):
 #   Read ABIOVE_raw_capacity_2025.xlsx directly.
-#     * Sheet "2.Evolução"                 → state t/day per year, 1989–2025
-#     * Sheet "3.Unidades de Processamento" → plant list with status 2024 & 2025
+#     * Sheet "2.Evolução"                 -> state t/day per year, 1989–2025
+#     * Sheet "3.Unidades de Processamento" -> plant list with status 2024 & 2025
 #   Apply Trsek-style equal allocation per state:
 #     per_plant_cap = state_cap_td[s, y] / n_active_soy_plants[s, y]
 #   Plants change between 2024 and 2025, so the roster is filtered per year.
 #   For years outside {2024, 2025} we fall back to the 2024 roster as a proxy.
 ABIOVE_CAP_FILE <- "data/raw/00/ABIOVE_processing/ABIOVE_raw_capacity_2025.xlsx"
 
-# Map: year → Ativa-column index in sheet 2 (R 1-based; openxlsx drops col A).
+# Map: year -> Ativa-column index in sheet 2 (R 1-based; openxlsx drops col A).
 YEAR_COL_MAP <- list(
   "1989"=3, "1995"=6, "1997"=9, "1998"=12,
   "2000"=15, "2001"=18, "2002"=21, "2003"=24, "2004"=27,
@@ -187,46 +187,37 @@ YEAR_COL_MAP <- list(
   "2020"=75, "2022"=78, "2023"=82, "2024"=86, "2025"=90
 )
 
-# openxlsx sometimes returns Portuguese accents as "Cuiab&#225;" — decode.
-.decode_html_entities <- function(x) {
-  x <- as.character(x); pat <- "&#([0-9]+);"
-  while (any(grepl(pat, x), na.rm = TRUE)) {
-    for (i in seq_along(x)) {
-      if (!is.na(x[i]) && grepl(pat, x[i])) {
-        code <- as.integer(sub(paste0(".*", pat, ".*"), "\\1", x[i]))
-        x[i] <- sub(pat, intToUtf8(code), x[i])
-      }
-    }
-  }
-  x
-}
-
-.abiove_state_cap <- function(year) {
+# State capacity (t/day) for one sector - reads sheet 2 Evolução restricted to
+# the requested block (Processamento / Refino / Envase). Sheet 2 stacks all
+# three in one long table; without restricting to the block we'd sum all three.
+.abiove_state_sector_cap <- function(year, sector = "Processamento") {
   ycol <- YEAR_COL_MAP[[as.character(year)]]
   if (is.null(ycol)) {
     avail <- as.integer(names(YEAR_COL_MAP))
     near <- max(avail[avail <= year])
-    cat("  [NOTE] ABIOVE state-cap: no col for", year, "— using", near, "\n")
+    cat("  [NOTE]", sector, "state-cap: no col for", year, "- using", near, "\n")
     ycol <- YEAR_COL_MAP[[as.character(near)]]
   }
   ev <- openxlsx::read.xlsx(ABIOVE_CAP_FILE, sheet = "2.Evolução",
                              colNames = FALSE, skipEmptyRows = FALSE)
-  # BUGFIX: sheet 2 stacks Processamento/Refino/Envase in one long table. Without
-  # restricting to the Processamento block we accidentally summed all three.
-  proc_start   <- which(ev$X1 == "Processamento")[1] + 1
-  refino_start <- which(ev$X1 == "Refino")[1]
-  proc_block   <- ev[proc_start:(refino_start - 1), ]
-  st <- proc_block[, c("X2", paste0("X", ycol))]
-  names(st) <- c("UF", "state_cap_td")
-  st$state_cap_td <- suppressWarnings(as.numeric(st$state_cap_td))
-  st <- st[!is.na(st$UF) & nchar(st$UF) == 2, ]
-  st$state_cap_td[is.na(st$state_cap_td)] <- 0
-  st %>% group_by(UF) %>%
+  # Locate the block boundaries by scanning col X1 for section headers
+  section_rows <- which(ev[, "X1"] %in% c("Processamento", "Refino", "Envase"))
+  names(section_rows) <- ev[section_rows, "X1"]
+  if (!(sector %in% names(section_rows))) stop("Sector not found: ", sector)
+  start <- section_rows[[sector]] + 1
+  next_sections <- section_rows[section_rows > section_rows[[sector]]]
+  end <- if (length(next_sections) > 0) min(next_sections) - 1 else nrow(ev)
+  block <- ev[start:end, c("X2", paste0("X", ycol))]
+  names(block) <- c("UF", "state_cap_td")
+  block$state_cap_td <- suppressWarnings(as.numeric(block$state_cap_td))
+  block <- block[!is.na(block$UF) & nchar(block$UF) == 2, ]
+  block$state_cap_td[is.na(block$state_cap_td)] <- 0
+  block %>% group_by(UF) %>%
     summarise(state_cap_td = sum(state_cap_td), .groups = "drop") %>%
     rename(nm_state = UF)
 }
 
-# Year → { file, era, sheet }  — the ABIOVE Pesquisa de Capacidade file that
+# Year -> { file, era, sheet }  - the ABIOVE Pesquisa de Capacidade file that
 # carries the plant roster for that year. Three file eras:
 #   early  (2003–2004): sheet "unidproces"
 #                         cols: Empresa | Nº | Localização | UF | Processo |
@@ -267,34 +258,19 @@ YEAR_COL_MAP <- list(
   "2025" = list(file = "ABIOVE_raw_capacity_2025.xlsx",   era = "multi", sheet = "3.Unidades de Processamento", status_col = "2025")
 )
 
-# Resolve a target year to the file entry to use (lower-bound fallback).
-.resolve_plant_entry <- function(year) {
-  avail <- sort(as.integer(names(.PLANT_INDEX)))
-  if (as.character(year) %in% names(.PLANT_INDEX)) {
-    return(list(entry = .PLANT_INDEX[[as.character(year)]], effective_year = year))
-  }
-  candidates <- avail[avail <= year]
-  if (length(candidates) == 0) {
-    # year is earlier than all available → use the EARLIEST file (2003)
-    eff <- min(avail)
-  } else {
-    eff <- max(candidates)
-  }
-  list(entry = .PLANT_INDEX[[as.character(eff)]], effective_year = eff)
-}
-
-# Parser for early era (2003-2004 unidproces sheet).
-.parse_plant_early <- function(file, sheet) {
+# -- Generic roster parsers (shared by processing AND refining lists) ---------
+# early era (2003/2004 unid* sheets): fixed column layout, flag column holds
+# "Soja"/"Algodão" text. extra_cols captures the layout difference:
+#   processing has a Processo column before the flag; refining has none.
+.parse_roster_early <- function(file, sheet, extra_cols = character(0)) {
   df <- as.data.frame(readxl::read_excel(file, sheet = sheet, col_names = FALSE,
                                          skip = 5))
-  # Columns (1-indexed): 1=code/blank, 2=Empresa, 3=Nº, 4=Localização, 5=UF,
-  #                       6=Processo, 7=Oleaginosas, 8=Situação
-  names(df)[1:8] <- c("x1","Empresas","num","Municipio","UF","Processo",
-                       "Oleaginosas","Situacao")
+  cols <- c("x1","Empresas","num","Municipio","UF", extra_cols, "flag","Situacao")
+  names(df)[seq_along(cols)] <- cols
   df %>%
     filter(!is.na(Empresas), !is.na(Municipio), !is.na(UF),
            nchar(as.character(UF)) == 2) %>%
-    mutate(soy_flag = toupper(trimws(as.character(Oleaginosas))) == "SOJA",
+    mutate(soy_flag = toupper(trimws(as.character(flag))) == "SOJA",
            status   = as.character(Situacao)) %>%
     filter(soy_flag, toupper(trimws(status)) == "ATIVA") %>%
     transmute(company = as.character(Empresas),
@@ -303,79 +279,70 @@ YEAR_COL_MAP <- list(
               status)
 }
 
-# Parser for mid era (2005-2015 geralproces sheet). Header row varies by file.
-# Strategy: read with no headers, scan for the row containing "Empresas" + "UF".
-.parse_plant_mid <- function(file, sheet) {
-  # Resolve the sheet name case/space/dot-insensitively against the file's actual
-  # sheets — names vary by year ('geralproces' vs 'Geralproces' vs 'Geral proces').
+# mid era (2004-2015 geral* sheets): header row auto-detected; sheet name varies
+# by year/case ('geralproces' vs '7. GeralRefin' …) so sheet_patterns are tried
+# in order against normalized names; the soy-flag header varies by sector.
+.parse_roster_mid <- function(file, sheet, sheet_patterns, flag_pattern) {
   sheets <- readxl::excel_sheets(file)
   .norm <- function(s) gsub("[[:space:]\\.]", "", tolower(s))
-  if (is.null(sheet)) {
-    idx <- which(grepl("geralproces|empreproces", .norm(sheets)))
-  } else {
-    idx <- which(.norm(sheets) == .norm(sheet))
-    if (length(idx) == 0) idx <- which(grepl("geralproces|empreproces", .norm(sheets)))
+  idx <- integer(0)
+  if (!is.null(sheet)) idx <- which(.norm(sheets) == .norm(sheet))
+  for (p in sheet_patterns) {
+    if (length(idx) > 0) break
+    idx <- which(grepl(p, .norm(sheets)))
   }
-  if (length(idx) == 0) stop("mid-era: no plant-list sheet matching '", sheet, "' in ", file)
+  if (length(idx) == 0 || is.na(idx[1]))
+    stop("mid-era: no roster sheet matching '", sheet, "' in ", file)
   sheet <- sheets[idx[1]]
   raw <- as.data.frame(suppressMessages(
     readxl::read_excel(file, sheet = sheet, col_names = FALSE, .name_repair = "minimal")))
-  # Find the header row
+  # Find the header row (contains "Empresas" + "UF")
   is_header <- apply(raw, 1, function(r) {
     v <- toupper(trimws(as.character(r)))
     any(grepl("EMPRESA", v), na.rm = TRUE) && any(v == "UF", na.rm = TRUE)
   })
   hdr <- which(is_header)[1]
   if (is.na(hdr)) stop("mid-era: header row not found in ", file)
-  # Header names
-  h <- as.character(raw[hdr, ])
-  h <- trimws(h)
-  # Find key columns by matching on upper-case content
+  h  <- trimws(as.character(raw[hdr, ]))
   HU <- toupper(h)
   get_col <- function(pat) {
-    i <- which(grepl(pat, HU))
-    if (length(i) == 0) return(NA_integer_) else i[1]
+    i <- which(grepl(pat, HU)); if (length(i) == 0) NA_integer_ else i[1]
   }
   emp <- get_col("EMPRESA")
   mun <- get_col("LOCALI|MUNIC")
   uf  <- which(HU == "UF")[1]
-  ole <- get_col("OLEAGIN")
-  sit <- get_col("SITUA|SITUAÇÃO")
-  need <- c(emp = emp, mun = mun, uf = uf, ole = ole, sit = sit)
-  if (any(is.na(need)))
-    stop("mid-era: missing columns in ", file, " — got: ",
-         paste(names(need)[is.na(need)], collapse=","))
+  ole <- get_col(flag_pattern)
+  sit <- get_col("SITUA")
+  if (any(is.na(c(emp, mun, uf, ole, sit))))
+    stop("mid-era: missing columns in ", file,
+         " (emp=", emp, " mun=", mun, " uf=", uf, " flag=", ole, " sit=", sit, ")")
   body <- raw[(hdr + 1):nrow(raw), , drop = FALSE]
-  df <- data.frame(
-    company      = as.character(body[[emp]]),
-    municipality = as.character(body[[mun]]),
-    UF           = as.character(body[[uf]]),
-    oleaginosas  = as.character(body[[ole]]),
-    status       = as.character(body[[sit]]),
-    stringsAsFactors = FALSE
-  )
-  df %>%
+  data.frame(company      = as.character(body[[emp]]),
+             municipality = as.character(body[[mun]]),
+             UF           = as.character(body[[uf]]),
+             flag         = as.character(body[[ole]]),
+             status       = as.character(body[[sit]]),
+             stringsAsFactors = FALSE) %>%
     filter(!is.na(company), !is.na(municipality), !is.na(UF),
            nchar(trimws(UF)) == 2) %>%
-    mutate(soy_flag = toupper(trimws(oleaginosas)) == "SOJA") %>%
+    mutate(soy_flag = toupper(trimws(flag)) == "SOJA") %>%
     filter(soy_flag, toupper(trimws(status)) == "ATIVA") %>%
     dplyr::select(company, municipality, UF, status)
 }
 
-# Parser for new/multi era (2018+ files with year-labeled status + Soja flag).
-.parse_plant_new <- function(file, sheet, status_col) {
+# new/multi era (2018+): year-labeled status column + "Soja" x-flag column.
+# Identical layout for processing and refining sheets.
+.parse_roster_new <- function(file, sheet, status_col) {
   raw <- as.data.frame(suppressMessages(
     readxl::read_excel(file, sheet = sheet, col_names = FALSE, .name_repair = "minimal")))
   # Find header row (contains "Empresas" + "Município")
   is_header <- apply(raw, 1, function(r) {
     v <- toupper(trimws(as.character(r)))
-    any(grepl("EMPRESA", v), na.rm = TRUE) &&
-    any(grepl("MUNIC",    v), na.rm = TRUE)
+    any(grepl("EMPRESA", v), na.rm = TRUE) && any(grepl("MUNIC", v), na.rm = TRUE)
   })
   hdr <- which(is_header)[1]
   if (is.na(hdr)) stop("new-era: header row not found in ", file)
-  h <- as.character(raw[hdr, ])
-  h <- trimws(h)
+  h  <- trimws(as.character(raw[hdr, ]))
   HU <- toupper(h)
   emp <- which(grepl("EMPRESA", HU))[1]
   mun <- which(grepl("MUNIC|LOCALI", HU))[1]
@@ -384,22 +351,19 @@ YEAR_COL_MAP <- list(
   # status col match: user-requested year literal
   stc <- which(h == status_col | trimws(h) == as.character(status_col))[1]
   if (is.na(stc)) {
-    # sometimes the year is stored as numeric in the sheet → match on as.numeric
+    # sometimes the year is stored as numeric in the sheet -> match on as.numeric
     stc <- which(suppressWarnings(as.numeric(h)) == as.numeric(status_col))[1]
   }
   if (any(is.na(c(emp, mun, uf, soj, stc))))
     stop("new-era: missing columns in ", file,
-         " — emp=", emp, " mun=", mun, " uf=", uf, " soja=", soj, " stc=", stc)
+         " (emp=", emp, " mun=", mun, " uf=", uf, " soja=", soj, " stc=", stc, ")")
   body <- raw[(hdr + 1):nrow(raw), , drop = FALSE]
-  df <- data.frame(
-    company      = as.character(body[[emp]]),
-    municipality = as.character(body[[mun]]),
-    UF           = as.character(body[[uf]]),
-    soja_flag    = as.character(body[[soj]]),
-    status       = as.character(body[[stc]]),
-    stringsAsFactors = FALSE
-  )
-  df %>%
+  data.frame(company      = as.character(body[[emp]]),
+             municipality = as.character(body[[mun]]),
+             UF           = as.character(body[[uf]]),
+             soja_flag    = as.character(body[[soj]]),
+             status       = as.character(body[[stc]]),
+             stringsAsFactors = FALSE) %>%
     filter(!is.na(company), !is.na(municipality), !is.na(UF),
            nchar(trimws(UF)) == 2) %>%
     mutate(soy_flag = toupper(trimws(soja_flag)) == "X") %>%
@@ -407,31 +371,38 @@ YEAR_COL_MAP <- list(
     dplyr::select(company, municipality, UF, status)
 }
 
-# Main dispatcher — returns tidy plant list for any year, with lower-bound fallback.
-.abiove_plant_list <- function(year) {
-  res <- .resolve_plant_entry(year)
-  entry <- res$entry; eff <- res$effective_year
+# Dispatcher - resolve year -> index entry (lower-bound fallback), parse per era.
+.abiove_roster <- function(year, index, label,
+                           early_extra_cols, mid_sheet_patterns, mid_flag_pattern) {
+  avail <- sort(as.integer(names(index)))
+  eff <- if (as.character(year) %in% names(index)) year else {
+    candidates <- avail[avail <= year]
+    if (length(candidates) == 0) min(avail) else max(candidates)
+  }
+  entry <- index[[as.character(eff)]]
   if (eff != year) {
-    cat("  [NOTE] Plant list: no file for", year, "— using", eff,
+    cat("  [NOTE]", label, "list: no file for", year, "- using", eff,
         "(lower-bound fallback)\n")
   }
   file <- file.path(.PLANT_PATH, entry$file)
-  if (!file.exists(file)) stop("Plant-list file not found: ", file)
-
+  if (!file.exists(file)) stop(label, "-list file not found: ", file)
   out <- switch(entry$era,
-    "early" = .parse_plant_early(file, entry$sheet),
-    "mid"   = .parse_plant_mid(file, entry$sheet),
-    "new"   = .parse_plant_new(file, entry$sheet, entry$status_col),
-    "multi" = .parse_plant_new(file, entry$sheet, entry$status_col),
+    "early" = .parse_roster_early(file, entry$sheet, early_extra_cols),
+    "mid"   = .parse_roster_mid(file, entry$sheet, mid_sheet_patterns, mid_flag_pattern),
+    "new"   = ,
+    "multi" = .parse_roster_new(file, entry$sheet, entry$status_col),
     stop("Unknown era: ", entry$era)
   )
-  cat("  Plant list: year =", year, "(file =", entry$file,
+  cat(" ", label, "list: year =", year, "(file =", entry$file,
       "); active soy plants =", nrow(out), "\n")
   out
 }
 
-.state_cap  <- .abiove_state_cap(YEAR)
-.plants     <- .abiove_plant_list(YEAR)
+.state_cap  <- .abiove_state_sector_cap(YEAR, "Processamento")
+.plants     <- .abiove_roster(YEAR, .PLANT_INDEX, "Plant",
+                              early_extra_cols   = "Processo",
+                              mid_sheet_patterns = "geralproces|empreproces",
+                              mid_flag_pattern   = "OLEAGIN")
 
 # Allocation method: equal-per-plant within each state (Stefan-style).
 # Each state's total ABIOVE capacity is split evenly across its active soy plants.
@@ -459,7 +430,7 @@ cat("  Processing facilities:", nrow(PROC_MUN_raw),
     round(sum(PROC_MUN_raw$capacity_td), 1), "t/day\n")
 
 
-# ── 1.4b Refining + bottling facilities (ABIOVE) ─────────────────────────────
+# -- 1.4b Refining + bottling facilities (ABIOVE) -----------------------------
 # Parallel to processing, with equal-per-state allocation.
 #   State Refino capacity:  sheet 2 rows 34-57 of ABIOVE_raw_capacity_2025
 #   State Envase capacity:  sheet 2 rows 58-80 (same sheet)
@@ -474,7 +445,7 @@ cat("  Processing facilities:", nrow(PROC_MUN_raw),
 #                             Refino e Envase"             UF, Região, YYYY (status),
 #                                                          Soja (flag), …
 #   multi  (2023, 2025):     same as new but multi-year status cols
-#   2018 is state-level only (no plant list) → fall back to 2015.
+#   2018 is state-level only (no plant list) -> fall back to 2015.
 
 .REFINING_INDEX <- list(
   "2003" = list(file = "pesquisa_capacidade_2003_PT.xls", era = "early", sheet = "unidrefin"),
@@ -498,189 +469,15 @@ cat("  Processing facilities:", nrow(PROC_MUN_raw),
   "2025" = list(file = "ABIOVE_raw_capacity_2025.xlsx",   era = "multi", sheet = "5.Unidades de Refino e Envase", status_col = "2025")
 )
 
-.resolve_refining_entry <- function(year) {
-  avail <- sort(as.integer(names(.REFINING_INDEX)))
-  if (as.character(year) %in% names(.REFINING_INDEX)) {
-    return(list(entry = .REFINING_INDEX[[as.character(year)]], effective_year = year))
-  }
-  candidates <- avail[avail <= year]
-  if (length(candidates) == 0) {
-    eff <- min(avail)
-  } else {
-    eff <- max(candidates)
-  }
-  list(entry = .REFINING_INDEX[[as.character(eff)]], effective_year = eff)
-}
-
-# State refining or bottling capacity — reads rows 34-57 (Refino) or 58-80 (Envase)
-# of sheet 2 Evolução. Row range determined by scanning col B for "Refino" / "Envase"
-# labels and taking rows between that label and the next.
-.abiove_state_sector_cap <- function(year, sector = "Refino") {
-  ycol <- YEAR_COL_MAP[[as.character(year)]]
-  if (is.null(ycol)) {
-    avail <- as.integer(names(YEAR_COL_MAP))
-    near <- max(avail[avail <= year])
-    cat("  [NOTE]", sector, "state-cap: no col for", year, "— using", near, "\n")
-    ycol <- YEAR_COL_MAP[[as.character(near)]]
-  }
-  ev <- openxlsx::read.xlsx(ABIOVE_CAP_FILE, sheet = "2.Evolução",
-                             colNames = FALSE, skipEmptyRows = FALSE)
-  # Locate the block boundaries by scanning col X1 for section headers
-  section_rows <- which(ev[, "X1"] %in% c("Processamento", "Refino", "Envase"))
-  names(section_rows) <- ev[section_rows, "X1"]
-  if (!(sector %in% names(section_rows))) stop("Sector not found: ", sector)
-  start <- section_rows[[sector]] + 1
-  next_sections <- section_rows[section_rows > section_rows[[sector]]]
-  end <- if (length(next_sections) > 0) min(next_sections) - 1 else nrow(ev)
-  block <- ev[start:end, c("X2", paste0("X", ycol))]
-  names(block) <- c("UF", "state_cap_td")
-  block$state_cap_td <- suppressWarnings(as.numeric(block$state_cap_td))
-  block <- block[!is.na(block$UF) & nchar(block$UF) == 2, ]
-  block$state_cap_td[is.na(block$state_cap_td)] <- 0
-  block %>% group_by(UF) %>%
-    summarise(state_cap_td = sum(state_cap_td), .groups = "drop") %>%
-    rename(nm_state = UF)
-}
-
-# Parsers for refining plant lists (very similar to processing parsers
-# but with refining-specific column headers).
-
-# early era (2003 unidrefin): cols Empresa, Nº, Localização, UF, Óleos Refinados, Situação
-.parse_refining_early <- function(file, sheet) {
-  df <- as.data.frame(readxl::read_excel(file, sheet = sheet, col_names = FALSE,
-                                         skip = 5))
-  # Structure matches unidproces but Oleaginosas → Óleos Refinados (text: "Soja"/"Algodão")
-  names(df)[1:7] <- c("x1","Empresas","num","Municipio","UF","OleosRefinados","Situacao")
-  df %>%
-    filter(!is.na(Empresas), !is.na(Municipio), !is.na(UF),
-           nchar(as.character(UF)) == 2) %>%
-    mutate(soy_flag = toupper(trimws(as.character(OleosRefinados))) == "SOJA",
-           status   = as.character(Situacao)) %>%
-    filter(soy_flag, toupper(trimws(status)) == "ATIVA") %>%
-    transmute(company = as.character(Empresas),
-              municipality = as.character(Municipio),
-              UF = as.character(UF),
-              status)
-}
-
-# mid era (2004-2015): geralrefin sheet; header row auto-detected (Empresa + UF + Óleos)
-.parse_refining_mid <- function(file, sheet) {
-  # Resolve the sheet name case/space/dot-insensitively (varies by year:
-  # 'geralrefin' vs 'Geralrefin' vs '7. geralrefin').
-  sheets <- readxl::excel_sheets(file)
-  .norm <- function(s) gsub("[[:space:]\\.]", "", tolower(s))
-  idx <- integer(0)
-  if (!is.null(sheet)) idx <- which(.norm(sheets) == .norm(sheet))
-  if (length(idx) == 0) {
-    # Prefer geralrefin (per-plant) over empresasrefin (company roster)
-    idx_g <- which(grepl("geralrefin", .norm(sheets)))
-    idx <- if (length(idx_g) > 0) idx_g[1] else which(grepl("empresasrefin", .norm(sheets)))[1]
-  }
-  if (length(idx) == 0 || is.na(idx)) stop("mid-era refining: no plant-list sheet matching '", sheet, "' in ", file)
-  sheet <- sheets[idx[1]]
-  raw <- as.data.frame(suppressMessages(
-    readxl::read_excel(file, sheet = sheet, col_names = FALSE, .name_repair = "minimal")))
-  is_header <- apply(raw, 1, function(r) {
-    v <- toupper(trimws(as.character(r)))
-    any(grepl("EMPRESA", v), na.rm = TRUE) && any(v == "UF", na.rm = TRUE)
-  })
-  hdr <- which(is_header)[1]
-  if (is.na(hdr)) stop("mid-era refining: header row not found in ", file)
-  h  <- trimws(as.character(raw[hdr, ]))
-  HU <- toupper(h)
-  get_col <- function(pat) {
-    i <- which(grepl(pat, HU)); if (length(i) == 0) NA_integer_ else i[1]
-  }
-  emp <- get_col("EMPRESA")
-  mun <- get_col("LOCALI|MUNIC")
-  uf  <- which(HU == "UF")[1]
-  ole <- get_col("ÓLEO|OLEO")   # "Óleos Refinados" text column
-  sit <- get_col("SITUA")
-  if (any(is.na(c(emp, mun, uf, ole, sit))))
-    stop("mid-era refining: missing cols in ", file,
-         " (emp=", emp, " mun=", mun, " uf=", uf, " ole=", ole, " sit=", sit, ")")
-  body <- raw[(hdr + 1):nrow(raw), , drop = FALSE]
-  df <- data.frame(
-    company      = as.character(body[[emp]]),
-    municipality = as.character(body[[mun]]),
-    UF           = as.character(body[[uf]]),
-    oleos        = as.character(body[[ole]]),
-    status       = as.character(body[[sit]]),
-    stringsAsFactors = FALSE
-  )
-  df %>%
-    filter(!is.na(company), !is.na(municipality), !is.na(UF),
-           nchar(trimws(UF)) == 2) %>%
-    mutate(soy_flag = toupper(trimws(oleos)) == "SOJA") %>%
-    filter(soy_flag, toupper(trimws(status)) == "ATIVA") %>%
-    dplyr::select(company, municipality, UF, status)
-}
-
-# new/multi era (2019+): 5.Unidades de Refino e Envase, Soja flag column
-.parse_refining_new <- function(file, sheet, status_col) {
-  raw <- as.data.frame(suppressMessages(
-    readxl::read_excel(file, sheet = sheet, col_names = FALSE, .name_repair = "minimal")))
-  is_header <- apply(raw, 1, function(r) {
-    v <- toupper(trimws(as.character(r)))
-    any(grepl("EMPRESA", v), na.rm = TRUE) && any(grepl("MUNIC", v), na.rm = TRUE)
-  })
-  hdr <- which(is_header)[1]
-  if (is.na(hdr)) stop("new-era refining: header row not found in ", file)
-  h  <- trimws(as.character(raw[hdr, ]))
-  HU <- toupper(h)
-  emp <- which(grepl("EMPRESA", HU))[1]
-  mun <- which(grepl("MUNIC|LOCALI", HU))[1]
-  uf  <- which(HU == "UF")[1]
-  soj <- which(HU == "SOJA")[1]
-  stc <- which(h == status_col | trimws(h) == as.character(status_col))[1]
-  if (is.na(stc)) {
-    stc <- which(suppressWarnings(as.numeric(h)) == as.numeric(status_col))[1]
-  }
-  if (any(is.na(c(emp, mun, uf, soj, stc))))
-    stop("new-era refining: missing cols in ", file,
-         " (emp=", emp, " mun=", mun, " uf=", uf, " soja=", soj, " stc=", stc, ")")
-  body <- raw[(hdr + 1):nrow(raw), , drop = FALSE]
-  df <- data.frame(
-    company      = as.character(body[[emp]]),
-    municipality = as.character(body[[mun]]),
-    UF           = as.character(body[[uf]]),
-    soja_flag    = as.character(body[[soj]]),
-    status       = as.character(body[[stc]]),
-    stringsAsFactors = FALSE
-  )
-  df %>%
-    filter(!is.na(company), !is.na(municipality), !is.na(UF),
-           nchar(trimws(UF)) == 2) %>%
-    mutate(soy_flag = toupper(trimws(soja_flag)) == "X") %>%
-    filter(soy_flag, toupper(trimws(status)) == "ATIVA") %>%
-    dplyr::select(company, municipality, UF, status)
-}
-
-.abiove_refining_list <- function(year) {
-  res <- .resolve_refining_entry(year)
-  entry <- res$entry; eff <- res$effective_year
-  if (eff != year) {
-    cat("  [NOTE] Refining list: no file for", year, "— using", eff,
-        "(lower-bound fallback)\n")
-  }
-  file <- file.path(.PLANT_PATH, entry$file)
-  if (!file.exists(file)) stop("Refining-list file not found: ", file)
-  out <- switch(entry$era,
-    "early" = .parse_refining_early(file, entry$sheet),
-    "mid"   = .parse_refining_mid(file, entry$sheet),
-    "new"   = .parse_refining_new(file, entry$sheet, entry$status_col),
-    "multi" = .parse_refining_new(file, entry$sheet, entry$status_col),
-    stop("Unknown refining era: ", entry$era)
-  )
-  cat("  Refining list: year =", year, "(file =", entry$file,
-      "); active soy refining plants =", nrow(out), "\n")
-  out
-}
-
 # Build REF_MUN_raw with equal-per-state allocation for both ref_cap and bot_cap
+# (state caps + roster parsed by the generic ABIOVE helpers defined in 1.4;
+#  mid-era prefers the per-plant geralrefin sheet over the empresasrefin roster)
 .ref_state_cap <- .abiove_state_sector_cap(YEAR, sector = "Refino")
 .bot_state_cap <- .abiove_state_sector_cap(YEAR, sector = "Envase")
-.ref_plants    <- .abiove_refining_list(YEAR)
+.ref_plants    <- .abiove_roster(YEAR, .REFINING_INDEX, "Refining",
+                                 early_extra_cols   = character(0),
+                                 mid_sheet_patterns = c("geralrefin", "empresasrefin"),
+                                 mid_flag_pattern   = "ÓLEO|OLEO")
 
 .ref_state_alloc <- .ref_plants %>%
   group_by(UF) %>%
@@ -713,7 +510,7 @@ cat("  Refining facilities:", nrow(REF_MUN_raw),
     round(sum(REF_MUN_raw$bot_cap_td), 1), "t/day\n")
 
 
-# ── 1.5 Population estimates (IBGE) ──────────────────────────────────────────
+# -- 1.5 Population estimates (IBGE) ------------------------------------------
 # Available: 2000-2022, 2024-2025. Gap at 2023 (falls back to 2022 Census).
 # Multiple formats: 2000-2021 = SIDRA CSV (skip=1);
 #                   2022 = Census (semicolon CSV, CO_MUN column);
@@ -742,25 +539,25 @@ if (pop_info$year %in% c(2022, 2024, 2025)) {
 }
 cat("  Population from year:", pop_info$year, "\n")
 
-# ── 1.6 Livestock headcounts (IBGE PPM, Table 3939) ─────────────────────────
+# -- 1.6 Livestock headcounts (IBGE PPM, Table 3939) -------------------------
 # Available: 2000-2025 yearly. Semicolon CSV, skip=4.
 # Contains: 10 animal types per municipality.
 LSTOCK_MUN <- read.csv2(
   file = paste0("data/raw/00/IBGE_livestock/Livestock_", YEAR, "_tabela3939_IBGE.csv"),
   header = TRUE, skip = 4, encoding = "UTF-8", stringsAsFactors = FALSE)
 
-# ── 1.7 Milked cows (IBGE, Table 94) ────────────────────────────────────────
+# -- 1.7 Milked cows (IBGE, Table 94) ----------------------------------------
 # Available: 2000-2024 yearly. Used to compute dairy cattle share.
 MILKCOWS_MUN <- read.csv2(
   file = paste0("data/raw/00/IBGE_milkcows/MilkCows_", YEAR, "_tabela94_IBGE.csv"),
   header = TRUE, skip = 3, encoding = "UTF-8", stringsAsFactors = FALSE)
 
-# ── 1.8 Grain storage facilities (IBGE / CONAB) ─────────────────────────────
+# -- 1.8 Grain storage facilities (IBGE / CONAB) -----------------------------
 # Static: 2014 shapefile with individual warehouse locations and capacity (CAP_TON).
 # Aggregated to municipality level below.
 STORAGE_MUN <- st_read("data/raw/00/IBGE_storage/armazens_2014.shp", quiet = TRUE)
 
-# ── 1.9 Per-capita soy oil acquisition (IBGE POF) ───────────────────────────
+# -- 1.9 Per-capita soy oil acquisition (IBGE POF) ---------------------------
 # Three editions: 2002-03, 2008-09, 2017-18. By state (27 values).
 # Used to allocate national food use of soy oil to municipalities.
 # Lower bound: e.g. for YEAR=2013, uses POF 2008 edition.
@@ -784,14 +581,22 @@ OIL_ACQ_STATE <- OIL_ACQ_raw %>%
   rename(oil_acq_pc = SOY_OIL_KG_PERCAPITA) %>%
   dplyr::select(nm_state, oil_acq_pc)
 cat("  POF soy oil from edition:", pof_info$year, "\n")
+# SENSITIVITY: scale per-capita soy-oil acquisition by MC_POF_MULT (default 1 =
+# no-op). Only reshapes the food-oil allocation across municipalities; national
+# food use stays fixed by the balance. Used by code/analysis/mc_sensitivity.R.
+.mc_pof <- suppressWarnings(as.numeric(Sys.getenv("MC_POF_MULT", "1")))
+if (!is.na(.mc_pof) && .mc_pof != 1) {
+  OIL_ACQ_STATE$oil_acq_pc <- OIL_ACQ_STATE$oil_acq_pc * .mc_pof
+  cat("  SENSITIVITY MC_POF_MULT =", .mc_pof, "applied to soy-oil acquisition\n")
+}
 
-# ── 1.10 Biodiesel capacity (ANP) ───────────────────────────────────────────
+# -- 1.10 Biodiesel capacity (ANP) -------------------------------------------
 # Available: 2008-2026 yearly (from yearbooks + panel data).
-# Before 2008: Brazil had no significant biodiesel industry → set to zero.
+# Before 2008: Brazil had no significant biodiesel industry -> set to zero.
 # Two sheets: "capacity" (per-plant m³/day) and "materials" (soy % by region).
 if (YEAR < 2008) {
   cat("  Biodiesel (ANP): year", YEAR,
-      "< 2008, no biodiesel industry yet — setting to zero\n")
+      "< 2008, no biodiesel industry yet - setting to zero\n")
   DIESEL_CAP_MUN <- data.frame(Empresa = character(), nm_mun = character(),
                                 nm_state = character(), diesel_cap = numeric(),
                                 stringsAsFactors = FALSE)
@@ -827,11 +632,11 @@ if (YEAR < 2008) {
 # SECTION 2: PREPARE, HARMONIZE AND FORMAT EACH DATASET
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ── 2.1 EXPORTS (COMEX) ─────────────────────────────────────────────────────
+# -- 2.1 EXPORTS (COMEX) -----------------------------------------------------
 # Steps:
 #   1. Filter for soy HS4 codes (1201=beans, 1507=oil, 2304=cake)
-#   2. Convert kg → tonnes, aggregate monthly → annual
-#   3. Fix COMEX state codes: SP(34→35), MS(52→50), GO(53→52), DF(54→53)
+#   2. Convert kg -> tonnes, aggregate monthly -> annual
+#   3. Fix COMEX state codes: SP(34->35), MS(52->50), GO(53->52), DF(54->53)
 #   4. Redistribute "undeclared municipality" exports (co_mun=9999999)
 #      proportionally to municipalities already exporting that product
 #      to the same destination country
@@ -914,7 +719,7 @@ EXP_MUN_SOY <- EXP_MUN_SOY %>%
 EXP_MUN_SOY <- EXP_MUN_SOY %>%
   dplyr::select(!c(destin_share:export_dol_ND))
 
-# Aggregate: sum across destination countries → one row per MU × product
+# Aggregate: sum across destination countries -> one row per MU × product
 EXP_MUN_SOY_agg <- EXP_MUN_SOY %>%
   group_by(co_mun, nm_mun, co_state, nm_state, HS4, product) %>%
   summarise(export = sum(export, na.rm = TRUE),
@@ -945,8 +750,8 @@ EXP_MUN_agg_list <- list(
 cat("  Exports:", round(sum(EXP_MUN_SOY$export)), "tonnes\n")
 
 
-# ── 2.2 IMPORTS (COMEX) ─────────────────────────────────────────────────────
-# Same processing as exports: filter soy, convert kg→t, aggregate, fix codes.
+# -- 2.2 IMPORTS (COMEX) -----------------------------------------------------
+# Same processing as exports: filter soy, convert kg->t, aggregate, fix codes.
 # No redistribution of undeclared imports (they're negligible).
 cat("  Processing imports...\n")
 
@@ -1009,7 +814,7 @@ IMP_MUN_agg_list <- list(
 cat("  Imports:", round(sum(IMP_MUN_SOY$import)), "tonnes\n")
 
 
-# ── 2.3 PRODUCTION (IBGE PAM) ───────────────────────────────────────────────
+# -- 2.3 PRODUCTION (IBGE PAM) -----------------------------------------------
 # Clean column names, convert to numeric, filter for target year, match codes.
 cat("  Processing production...\n")
 
@@ -1026,7 +831,7 @@ cat("  Production:", sum(PROD_MUN$prod, na.rm = TRUE), "tonnes from",
     nrow(PROD_MUN), "municipalities\n")
 
 
-# ── 2.4 PROCESSING FACILITIES (ABIOVE) ──────────────────────────────────────
+# -- 2.4 PROCESSING FACILITIES (ABIOVE) --------------------------------------
 # Match municipality names from the longitudinal CSV to IBGE co_mun codes.
 # Some names need manual correction (spelling differences ABIOVE vs IBGE).
 
@@ -1091,7 +896,7 @@ cat("  Processing:", nrow(PROC_MUN), "municipalities;",
     "bot_cap", round(sum(PROC_MUN$bot_cap, na.rm = TRUE), 1), "t/d\n")
 
 
-# ── 2.5 POPULATION (IBGE) ───────────────────────────────────────────────────
+# -- 2.5 POPULATION (IBGE) ---------------------------------------------------
 cat("  Processing population...\n")
 
 if (!"co_mun" %in% names(POP_MUN))
@@ -1109,7 +914,7 @@ if ("nm_mun_raw" %in% names(POP_MUN)) {
 cat("  Population:", sum(POP_MUN$population, na.rm = TRUE), "\n")
 
 
-# ── 2.6 LIVESTOCK (IBGE PPM) ────────────────────────────────────────────────
+# -- 2.6 LIVESTOCK (IBGE PPM) ------------------------------------------------
 # Filter for municipality-level rows (marked "MU" in col 1),
 # rename animal types to English, merge with milked cows.
 cat("  Processing livestock...\n")
@@ -1142,7 +947,7 @@ LSTOCK_MUN <- LSTOCK_MUN %>% dplyr::select(-nm_mun_raw)
 cat("  Cattle:", sum(LSTOCK_MUN$cattle, na.rm = TRUE), "\n")
 
 
-# ── 2.7 GRAIN STORAGE (IBGE) ────────────────────────────────────────────────
+# -- 2.7 GRAIN STORAGE (IBGE) ------------------------------------------------
 # Aggregate individual warehouse capacities (CAP_TON) to municipality level.
 all(unique(STORAGE_MUN$GEOCODIGO %in% MUN$co_mun))
 STORAGE_MUN <- STORAGE_MUN %>%
@@ -1152,11 +957,11 @@ STORAGE_MUN <- STORAGE_MUN %>%
   rename("co_mun" = "GEOCODIGO")
 
 
-# ── 2.8 SOY OIL ACQUISITION (POF) ───────────────────────────────────────────
+# -- 2.8 SOY OIL ACQUISITION (POF) -------------------------------------------
 # Already loaded and formatted in Section 1.9 (OIL_ACQ_STATE).
 
 
-# ── 2.9 BIODIESEL (ANP) ─────────────────────────────────────────────────────
+# -- 2.9 BIODIESEL (ANP) -----------------------------------------------------
 # Convert per-plant biodiesel capacity to soy-specific biodiesel capacity
 # by applying regional soy feedstock shares.
 if (nrow(DIESEL_CAP_MUN) > 0) {
@@ -1290,10 +1095,10 @@ cat("  Processing:", sum(SOY_MUN$proc_cap), "t/day\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SECTION 4: SPATIAL DATA — POLYGONS, CENTROIDS, DISTANCE MATRICES
+# SECTION 4: SPATIAL DATA - POLYGONS, CENTROIDS, DISTANCE MATRICES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ── 4.1 Municipality boundaries (from geobr) ────────────────────────────────
+# -- 4.1 Municipality boundaries (from geobr) --------------------------------
 # Load the boundary file for the nearest available year, rename columns
 # from geobr format (code_muni, name_muni) to pipeline format (co_mun, nm_mun),
 # merge with SOY_MUN, and project to SIRGAS 2000 Brazil Polyconic (EPSG:5880).
@@ -1326,7 +1131,7 @@ GEO_BRA <- summarise(GEO_MUN_SOY)
 GEO_BRA_EXT <- st_as_sfc(st_bbox(GEO_MUN_SOY))
 
 
-# ── 4.2 Municipality capitals ───────────────────────────────────────────────
+# -- 4.2 Municipality capitals -----------------------------------------------
 # Capital = "sede municipal" = the city seat of each municipality.
 # Used for capital-to-capital distance matrix (alternative to centroid-based).
 # Source: IBGE Localities 2010 shapefile (CD_NIVEL=1 = capital).

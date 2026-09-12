@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brazilian soy land-use footprint — municipal origin</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root { --ink:#1A1A1A; --muted:#6B6B6B; }
+  html,body { margin:0; height:100%; font-family:'DejaVu Sans',Helvetica,Arial,sans-serif; color:var(--ink); }
+  #map { position:absolute; inset:0; }
+  .panel { position:absolute; top:12px; left:12px; z-index:2; background:rgba(255,255,255,.94);
+           border-radius:10px; padding:12px 14px; box-shadow:0 1px 6px rgba(0,0,0,.18); width:300px; }
+  .panel h1 { font-size:15px; margin:0 0 2px; }
+  .panel .sub { font-size:11px; color:var(--muted); margin:0 0 10px; line-height:1.35; }
+  label { font-size:11px; color:var(--muted); display:block; margin:8px 0 3px; text-transform:uppercase; letter-spacing:.04em; }
+  select, input[type=range] { width:100%; }
+  select { padding:5px; border:1px solid #ccc; border-radius:6px; font-size:13px; }
+  .yearrow { display:flex; align-items:center; gap:8px; }
+  .yearrow button { border:1px solid #ccc; background:#fff; border-radius:6px; padding:4px 9px; cursor:pointer; font-size:13px; }
+  .yearrow #ylabel { font-weight:bold; font-size:15px; min-width:38px; text-align:center; }
+  .stat { margin-top:8px; font-size:12px; color:var(--muted); }
+  .stat b { color:var(--ink); font-size:15px; }
+  .legend { position:absolute; bottom:18px; left:12px; z-index:2; background:rgba(255,255,255,.94);
+            border-radius:8px; padding:8px 10px; box-shadow:0 1px 6px rgba(0,0,0,.18); font-size:10px; color:var(--muted); }
+  .legend .bar { width:200px; height:10px; border-radius:3px; margin-bottom:3px;
+     background:linear-gradient(to right,#fff7ec,#fee8c8,#fdd49e,#fdae61,#f16913,#d7301f,#7f0000); }
+  .legend .ticks { display:flex; justify-content:space-between; }
+  .maplibregl-popup-content { font-size:12px; padding:6px 9px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel">
+  <h1>Brazilian soy land-use footprint</h1>
+  <p class="sub">Hectares of soy land embodied in a destination's consumption, by municipality of origin. Choose a destination and drag the year. Hover a municipality for hectares.</p>
+  <label for="dest">Destination</label>
+  <select id="dest"></select>
+  <label>Year</label>
+  <div class="yearrow">
+    <button id="play">▶</button>
+    <input type="range" id="year" />
+    <span id="ylabel"></span>
+  </div>
+  <div class="stat">Total for this view: <b id="tot">–</b> Mha</div>
+</div>
+<div class="legend">
+  <div class="bar"></div>
+  <div class="ticks"><span>0</span><span id="lmid"></span><span id="lmax"></span></div>
+  <div style="margin-top:2px">Land footprint per municipality (1000 ha) · √-scaled</div>
+</div>
+
+<script>
+const COLORS = ['#fff7ec','#fee8c8','#fdd49e','#fdae61','#f16913','#d7301f','#7f0000'];
+let META, VMAX, YEARS, curData=null, curYearIdx=0, active=new Set(), playing=null;
+
+// sqrt-spaced colour stops 0..VMAX -> COLORS, as a MapLibre interpolate expression
+function colorExpr() {
+  const v = ['coalesce', ['feature-state','v'], 0];
+  const stops = [];
+  for (let i=0;i<COLORS.length;i++){ const p=i/(COLORS.length-1); stops.push(Math.round(VMAX*p*p), COLORS[i]); }
+  return ['interpolate',['linear'], v, ...stops];
+}
+
+// Blank white canvas — no world base map, so ONLY Brazil (our municipal polygons) is drawn.
+const map = new maplibregl.Map({
+  container:'map',
+  style:{version:8, sources:{}, layers:[{id:'bg', type:'background', paint:{'background-color':'#ffffff'}}]},
+  center:[-54,-14], zoom:3.7, attributionControl:false
+});
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+map.on('load', async () => {
+  META = await (await fetch('data/index.json')).json();
+  VMAX = META.vmax; YEARS = META.years;
+  document.getElementById('lmid').textContent = Math.round(VMAX*0.25/1000);
+  document.getElementById('lmax').textContent = Math.round(VMAX/1000);
+
+  // destination dropdown, grouped
+  const sel = document.getElementById('dest');
+  const grp = {Region:document.createElement('optgroup'), Country:document.createElement('optgroup')};
+  grp.Region.label='Regions'; grp.Country.label='Countries';
+  META.destinations.forEach(d=>{ const o=document.createElement('option');
+    o.value=d.key; o.textContent=d.label; grp[d.group].appendChild(o); });
+  sel.appendChild(grp.Region); sel.appendChild(grp.Country);
+
+  // year slider
+  const yr=document.getElementById('year');
+  yr.min=0; yr.max=YEARS.length-1; yr.step=1; yr.value=YEARS.length-1; curYearIdx=YEARS.length-1;
+
+  map.addSource('mun', {type:'geojson', data:'municipios.geojson', promoteId:'co_mun'});
+  map.addLayer({id:'fill', type:'fill', source:'mun',
+    paint:{'fill-color':colorExpr(), 'fill-opacity':0.95}});
+  map.addLayer({id:'outline', type:'line', source:'mun',
+    paint:{'line-color':'#9a9a9a', 'line-width':0.25, 'line-opacity':0.55}});
+
+  sel.onchange = ()=>loadDest(sel.value);
+  yr.oninput   = ()=>{ curYearIdx=+yr.value; render(); };
+  document.getElementById('play').onclick = togglePlay;
+
+  await loadDest('total');
+  setupHover();
+});
+
+function firstSymbolId(){ // put fills under base-map labels
+  for (const l of map.getStyle().layers) if (l.type==='symbol') return l.id;
+}
+
+async function loadDest(key){
+  curData = await (await fetch('data/'+key+'.json')).json();
+  render();
+}
+
+function render(){
+  if(!curData) return;
+  const yi=curYearIdx, d=curData.data;
+  for (const id of active) map.setFeatureState({source:'mun', id:+id}, {v:0});
+  active.clear();
+  let tot=0;
+  for (const id in d){ const v=d[id][yi]; tot+=v; if(v>0){ map.setFeatureState({source:'mun', id:+id},{v}); active.add(id); } }
+  document.getElementById('ylabel').textContent = YEARS[yi];
+  document.getElementById('year').value = yi;
+  document.getElementById('tot').textContent = (tot/1e6).toFixed(1);
+}
+
+function togglePlay(){
+  const btn=document.getElementById('play');
+  if(playing){ clearInterval(playing); playing=null; btn.textContent='▶'; return; }
+  btn.textContent='❚❚';
+  playing=setInterval(()=>{ curYearIdx=(curYearIdx+1)%YEARS.length; render(); }, 850);
+}
+
+function setupHover(){
+  const popup=new maplibregl.Popup({closeButton:false, closeOnMove:false});
+  map.on('mousemove','fill',(e)=>{
+    map.getCanvas().style.cursor='pointer';
+    const f=e.features[0], id=f.id, yi=curYearIdx;
+    const v = curData && curData.data[id] ? curData.data[id][yi] : 0;
+    popup.setLngLat(e.lngLat)
+      .setHTML(`<b>${f.properties.nm_mun}</b><br>${(v||0).toLocaleString()} ha`).addTo(map);
+  });
+  map.on('mouseleave','fill',()=>{ map.getCanvas().style.cursor=''; popup.remove(); });
+}
+</script>
+</body>
+</html>

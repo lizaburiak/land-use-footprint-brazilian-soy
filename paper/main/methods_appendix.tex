@@ -1,0 +1,35 @@
+\section{Livestock system splits}\label{app:livestock}
+Let $s^{k}_m$ denote municipality $m$'s share of system $k$ in the 2010
+gridded-livestock rasters (area-weighted zonal sums, normalized across the
+systems of each species); where a municipality reports a herd in the run year
+but had no gridded animals in 2010, the state-mean share is substituted. Pigs
+and chickens are split as
+\begin{equation}
+  N^{\mathrm{pig},k}_m=\text{pig}_m\,s^{\mathrm{Pg},k}_m,\quad
+  N^{\mathrm{chk}}_{m,\mathrm{byd}}=\text{chicken}_m\,s^{\mathrm{Ch,Ext}}_m,\quad
+  N^{\mathrm{chk}}_{m,\mathrm{lay}}=\text{chicken\_layer}_m\,s^{\mathrm{Ch,Int}}_m,
+\end{equation}
+with broilers
+$N^{\mathrm{chk}}_{m,\mathrm{bro}}=(\text{chicken}_m-\text{chicken\_layer}_m)\,s^{\mathrm{Ch,Int}}_m$
+(or $\text{chicken}_m\,s^{\mathrm{Ch,Int}}_m$ where layers are unreported).
+Feedlot cattle are the 2006 census counts scaled by the national confinement
+growth factor for the run year (e.g.\ $4.38/3.46\approx1.27$ for 2013, from
+ABIEC/Athenagro), holding the municipal pattern fixed. The remaining cattle
+are split into grassland/mixed systems by the raster shares
+$s^{\mathrm{Catt},u}_m$, $u\in\{\mathrm{gra,mix}\}$, with dairy identified by
+milked cows and meat as the residual:
+\begin{align}
+  N^{\mathrm{cattle}}_{m,u,\mathrm{dair}}&=\text{cattle\_milked}_m\,s^{\mathrm{Catt},u}_m,\\
+  N^{\mathrm{cattle}}_{m,u,\mathrm{meat}}&=\big(\text{cattle}_m-\text{cattle\_milked}_m-N^{\mathrm{cattle,flot}}_m\big)\,s^{\mathrm{Catt},u}_m .
+\end{align}
+Buffalo use the municipal milked-cow ratio
+$\rho_m=\text{cattle\_milked}_m/\text{cattle}_m$ as the dairy proxy,
+\begin{equation}
+  N^{\mathrm{buf}}_{m,u,\mathrm{dair}}=\text{buffalo}_m\,\rho_m\,s^{\mathrm{Buff},u}_m,
+  \qquad
+  N^{\mathrm{buf}}_{m,u,\mathrm{meat}}=\text{buffalo}_m\,(1-\rho_m)\,s^{\mathrm{Buff},u}_m .
+\end{equation}
+Each species' subsystems partition its reported herd exactly, e.g.\
+$\text{cattle}_m=N^{\mathrm{cattle,flot}}_m+\sum_{u}\sum_{v\in\{\mathrm{dair,meat}\}}N^{\mathrm{cattle}}_{m,u,v}$.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

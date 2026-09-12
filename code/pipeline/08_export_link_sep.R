@@ -16,6 +16,7 @@ library(abind)
 library(Matrix)
 # Note: Stefan's original loaded Matrix.utils (removed from CRAN in 2022).
 library(parallel)
+source("code/pipeline/00_checks.R")
 
 write = TRUE
 
@@ -25,6 +26,8 @@ bs_res_dir <- paste0("./data/generated/outputs/gams/bs_res_", YEAR)
 
 flows_euclid <- readRDS(paste0("data/generated/outputs/07_", YEAR, "/flows_euclid.rds"))
 bs_files <- if (dir.exists(bs_res_dir)) list.files(bs_res_dir, pattern="*.rds", full.names=F) else character(0)
+# SENSITIVITY: force Euclidean-only - see note in 08_export_link_mean.R. No-op unset.
+if (nzchar(Sys.getenv("SENS_EUCLID_ONLY"))) bs_files <- character(0)
 if (length(bs_files) > 0) {
   flows_bs <- lapply(bs_files, function(file){
     readRDS(file.path(bs_res_dir, file))
@@ -33,7 +36,7 @@ if (length(bs_files) > 0) {
   flows <- c(flows_euclid, flows_bs)
   rm(flows_bs)
 } else {
-  message("No GAMS bootstrap files at ", bs_res_dir, " — running Euclidean-only.")
+  message("No GAMS bootstrap files at ", bs_res_dir, " - running Euclidean-only.")
   flows <- flows_euclid
 }
 
@@ -98,9 +101,13 @@ system.time(
       diag(mat) <- as.numeric(pull(SOY_MUN, paste0("total_supply_",x)) - pull(SOY_MUN, paste0("excess_supply_",x)))
       return(as(mat, "Matrix"))}, USE.NAMES = TRUE, simplify = FALSE)
 
+    # tolerance 2e-3: step 07 rescales the larger transport margin by up to
+    # ~0.1% to balance the problem after dropping non-geographic nodes
     lapply(product, function(x){
-      all.equal(rowSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_supply_",x), name = "co_mun"))
-      all.equal(colSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_use_",x), name = "co_mun"))})
+      assert_equal(rowSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_supply_",x), name = "co_mun"),
+                   paste0("08 flow matrix rows = total supply, ", x), tolerance = 2e-3)
+      assert_equal(colSums(flow_wide_full[[x]]), pull(SOY_MUN, paste0("total_use_",x), name = "co_mun"),
+                   paste0("08 flow matrix cols = total use, ", x), tolerance = 2e-3)})
 
 
     dom_share <- sapply(product, function(x){

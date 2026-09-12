@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("archive/fabio_stefan/inst")) == 0) {
@@ -21,14 +11,13 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 ## create hybrid MRIO using Exiobase
 
 library(Matrix)
 library(parallel)
 library(data.table)
+source("code/pipeline/00_checks.R")
 
 write = TRUE
 
@@ -151,20 +140,12 @@ hybridise <- function(year, Sup, Use, Cou, Y_all) {
   # replace Oth in full Y table
   Y[, grep("other$", colnames(Y))] <- Oth_new
   
-  # alternative option (same result):
-  # Oth_no50 <- Oth[,colnames(Oth) %in% conc$FAO_code[conc$EXIOBASE_code != 50]]
-  # fabio_to_exio <- conc$EXIOBASE_code[match(as.numeric(colnames(Oth_no50)), conc$FAO_code)]
-  # Oth_shares <- Oth_no50/Oth_exio[,fabio_to_exio]
-  # Oth_shares[is.na(Oth_shares)] <- 0
-  # # split
-  # Oth_resid_alloc <- Oth_shares * Oth_resid[,fabio_to_exio]
-  # # replace original Oth with residuals
-  # Oth_new <- Oth
-  # Oth_new[, colnames(Oth_resid_alloc)] <- Oth_resid_alloc
-  
-  # check sums: does allocated + unallocated Other use correspond to original Other use?
-  all.equal(sum(Oth),   sum(B) + sum(Oth_new))
-  all.equal(rowSums(Oth), rowSums(B) + rowSums(Oth_new))
+  # check sums: does allocated + unallocated Other use correspond to original
+  # Other use? (was a silent in-function all.equal; now halts on failure)
+  assert_equal(sum(Oth), sum(B) + sum(Oth_new),
+               "18 hybridization preserves total Other use")
+  assert_equal(rowSums(Oth), rowSums(B) + rowSums(Oth_new),
+               "18 hybridization preserves Other use by process")
 
   # TODO: why does B have these weird colnames?
   dimnames(B) <- list(rownames(Y), colnames(Z))
@@ -180,14 +161,9 @@ hybridise <- function(year, Sup, Use, Cou, Y_all) {
 
 Y_all <- readRDS("data/generated/fabio/Y.rds")
   
-# Setup to process in parallel
-#  n_cores <- parallel::detectCores() - 2
-#  cl <- parallel::makeCluster(n_cores)
-  
 # Years to calculate hybridised FABIO for
 years <- YEAR
-  
-#output <- mclapply(cl, years, hybridise, Sup, Use, Cou, Y_all, mc.cores = detectCores())
+
 output <- lapply(years, hybridise, Sup, Use, Cou, Y_all)
 names(output) <- years
 

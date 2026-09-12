@@ -1,0 +1,70 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SOYPRINT -- assembled manuscript (Overleaf master file)
+%% Body content lives in *_body.tex (generated from the standalone
+%% section documents); edit those, not this file, for section text.
+%% Compile: pdflatex main && bibtex main && pdflatex main && pdflatex main
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[pdflatex,sn-nature]{sn-jnl}% Nature Portfolio reference style
+
+%%%% Standard packages
+\usepackage{graphicx}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{geometry}%
+\usepackage{tikz}%
+\usetikzlibrary{arrows.meta,positioning,decorations.pathreplacing}
+
+%%%% Math helpers (used by the Methods section)
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\diag}{diag}
+\newcommand{\CBS}[2]{\mathrm{CBS}[#1,#2]}
+
+\graphicspath{{figures/}}
+
+\raggedbottom
+
+\begin{document}
+
+\title[Land-use footprint of Brazilian soy]{Mapping the land-use footprint
+of Brazilian soy embodied in international consumption: a spatially explicit
+input--output approach}
+
+\author*[1]{\fnm{} \sur{}}\email{}
+
+\affil*[1]{\orgdiv{Institute for Ecological Economics},
+\orgname{Vienna University of Economics and Business (WU)},
+\orgaddress{\city{Vienna}, \country{Austria}}}
+
+\abstract{\emph{TODO: abstract.}}
+
+\keywords{soy, land footprint, telecoupling, MRIO, FABIO, Brazil, deforestation}
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}\label{sec:intro}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\emph{TODO: introduction.}
+
+\input{results_body}
+
+\input{methods_body}
+
+\input{data_body}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\appendix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\input{methods_appendix}
+\input{annex_links}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibliography{refs}%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}

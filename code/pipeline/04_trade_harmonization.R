@@ -106,7 +106,7 @@ btd_regions <- unique(btd_exp$from_code)
 if (length(btd_regions) == 0) {
   btd_regions <- FABIO_regions$FAO.Code
   message("[04] btd_exp empty for YEAR=", YEAR,
-          " — using FABIO_regions$FAO.Code (", length(btd_regions), " countries) as country list.")
+          " - using FABIO_regions$FAO.Code (", length(btd_regions), " countries) as country list.")
 }
 all.equal(FABIO_regions$FAO.Code, btd_regions)
 regions <- regions %>%
@@ -239,16 +239,6 @@ colSums(EXP_NAT_SOY[,c(5:ncol(EXP_NAT_SOY))], na.rm = TRUE)
 colSums(IMP_NAT_SOY[,c(5:ncol(IMP_NAT_SOY))], na.rm = TRUE)
 
 
-# check country sums by product
-EXP_SOY <- EXP_NAT_SOY %>%
-   group_by(product) %>%
-   summarise(across(starts_with('export'), .fns = sum, na.rm = TRUE))
-
-IMP_SOY <- IMP_NAT_SOY %>%
-   group_by(product) %>%
-   summarise(across(starts_with('import'), .fns = sum, na.rm = TRUE))
-
-
 # export data --------------------------------------
 
 if (write){
@@ -262,9 +252,6 @@ if (write){
    saveRDS(EXP_NAT_SOY, file = file.path(out_dir, "EXP_NAT_SOY.rds"))
    saveRDS(IMP_NAT_SOY, file = file.path(out_dir, "IMP_NAT_SOY.rds"))
    saveRDS(regions, file = file.path(out_dir, "regions.rds"))
-   write.csv2(regions, file = file.path(out_dir, "regions.csv"))
-   saveRDS(btd_exp_BRA_soy_exp, file = file.path(out_dir, "btd_exp_BRA_soy.rds"))
-   saveRDS(btd_exp_BRA_soy_exp, file = file.path(out_dir, "btd_imp_BRA_soy.rds"))
 
 }
 

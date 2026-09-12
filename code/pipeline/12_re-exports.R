@@ -23,6 +23,7 @@ library(dplyr)
 library(tidyr)
 library(tibble)
 source("code/shared/fabio_tidy_functions.R")
+source("code/pipeline/00_checks.R")
 
 write = TRUE
 
@@ -39,7 +40,12 @@ soy_items <- c("bean" = 2555, "oil" = 2571, "cake" = 2590)
 # Prefer it when available; fall back to Stefan's 2013-pinned snapshot otherwise.
 .btd_new_path <- "data/fabio/trade/new/btd_bal.RData"
 .btd_old_path <- "data/fabio/trade/FABIO_exp/v1/btd_bal.rds"
-if (file.exists(.btd_new_path)) {
+# PRE-2010: the new file only covers 2010-2023; the v2 build was never extended
+# further back (branch data-2010-current). For earlier years use Stefan's v1
+# snapshot (1986-2013) directly instead of loading 1.4 GB just to get 0 rows.
+# SOYPRINT_FORCE_V11=1 forces the v1/v1.1 path on 2010+ years (vintage cross-checks).
+.use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
+if (file.exists(.btd_new_path) && !.use_v11) {
   .env <- new.env()
   load(.btd_new_path, envir = .env)
   btd <- as.data.frame(.env$btd_bal) %>% filter(year == YEAR)
@@ -47,6 +53,7 @@ if (file.exists(.btd_new_path)) {
   message(sprintf("[12] Loaded btd from new multi-year file (%d rows for YEAR=%d).", nrow(btd), YEAR))
 } else {
   btd <- readRDS(.btd_old_path) %>% filter(year == YEAR)
+  message(sprintf("[12] Loaded btd from v1 snapshot 1986-2013 (%d rows for YEAR=%d).", nrow(btd), YEAR))
 }
 btd_soy <- filter(btd, item_code %in% soy_items)
 
@@ -56,7 +63,12 @@ btd_soy <- filter(btd, item_code %in% soy_items)
 # (the new schema folds it into balancing/residuals).
 .cbs_new_path <- "data/fabio/trade/new/cbs_full.rds"
 .cbs_old_path <- "data/fabio/trade/FABIO_exp/v1/cbs_full.rds"
-if (file.exists(.cbs_new_path)) {
+# PRE-2010: the new cbs_full has rows for 1961-2009 but they are DEGENERATE
+# placeholders (soybeans: production == feed, imports/exports/processing/food all 0
+# through 2009, real balances only from 2010). Using them dumps all trade into
+# stock_addition and collapses the footprint. The v1 cbs (1961-2019) has real
+# balances -- use it for pre-2010 years.
+if (file.exists(.cbs_new_path) && !.use_v11) {
   cbs <- readRDS(.cbs_new_path) %>% filter(year == YEAR)
   if ("supply" %in% names(cbs) && !"total_supply" %in% names(cbs)) {
     cbs <- dplyr::rename(cbs, total_supply = supply)
@@ -65,6 +77,7 @@ if (file.exists(.cbs_new_path)) {
   message(sprintf("[12] Loaded cbs from new multi-year file (%d rows for YEAR=%d).", nrow(cbs), YEAR))
 } else {
   cbs <- readRDS(.cbs_old_path) %>% filter(year == YEAR)
+  message(sprintf("[12] Loaded cbs from v1 file 1961-2019 (%d rows for YEAR=%d).", nrow(cbs), YEAR))
 }
 
 if (nrow(btd) == 0 || nrow(cbs) == 0) {
@@ -265,7 +278,7 @@ invert_reex <- function(M, item) {
     reex_singular[[as.character(item)]] <<- how
     as(r, "CsparseMatrix")
   }
-  # 2) plain dense solve — recovers exact values when only the sparse LU choked
+  # 2) plain dense solve - recovers exact values when only the sparse LU choked
   r <- tryCatch(solve(Md), error = function(e) NULL)
   if (!is.null(r)) return(finish(r, "dense (sparse LU failed)"))
   # 3) dense solve with a ridge SCALED to the matrix magnitude. A fixed 1e-8 is too
@@ -275,9 +288,9 @@ invert_reex <- function(M, item) {
   r <- tryCatch(solve(Md + diag(eps, nrow(Md))), error = function(e) NULL)
   if (!is.null(r)) return(finish(r, sprintf("dense + scaled ridge eps=%.2e", eps)))
   # 4) truly singular -> Moore-Penrose pseudo-inverse (always defined; least-norm).
-  #    The re-export balance (colSums≈dom_use / rowSums≈dom_supply) is then only
-  #    approximate for this one commodity — flagged here so it's transparent.
-  return(finish(MASS::ginv(Md), "pseudo-inverse (MASS::ginv) — re-export balance approximate"))
+  #    The re-export balance (colSums~dom_use / rowSums~dom_supply) is then only
+  #    approximate for this one commodity (logged in reex_singular).
+  return(finish(MASS::ginv(Md), "pseudo-inverse (MASS::ginv) - re-export balance approximate"))
 }
 
 reex <- lapply(items$item_code, function(x){
@@ -315,9 +328,26 @@ reex <- lapply(items$item_code, function(x){
   mat <- t(t(mat) * data$dom_use)
   colnames(mat) <- rownames(mat)
 
-  cat(x, ": ",
-      all.equal(colSums(mat), data$dom_use, check.attributes = FALSE), " / ",
-      all.equal(rowSums(mat), data$dom_supply, check.attributes = FALSE), " \n")
+  # Balance of the re-export inversion: colSums must recover domestic use,
+  # rowSums domestic supply. Hard assertion for the sparse-solver path; items
+  # that needed a robust fallback (ridge / pseudo-inverse) are only
+  # approximately balanced by construction, so those keep the printed check.
+  # tolerance 1e-4: for heavily re-exported commodities (I - R) is poorly
+  # conditioned even when the sparse solve succeeds, so the recovered margins
+  # carry solver noise above all.equal's 1.5e-8 default (soybean oil, 2013:
+  # 2.3e-5). Anything above 1e-4 indicates a genuine imbalance.
+  if (as.character(x) %in% names(reex_singular)) {
+    cat(x, " (fallback inversion, approximate balance expected): ",
+        all.equal(colSums(mat), data$dom_use, check.attributes = FALSE), " / ",
+        all.equal(rowSums(mat), data$dom_supply, check.attributes = FALSE), " \n")
+  } else {
+    assert_equal(colSums(mat), data$dom_use,
+                 paste0("12 re-export colSums = domestic use, item ", x),
+                 tolerance = 1e-4)
+    assert_equal(rowSums(mat), data$dom_supply,
+                 paste0("12 re-export rowSums = domestic supply, item ", x),
+                 tolerance = 1e-4)
+  }
 
   return(mat)
 })
@@ -360,7 +390,6 @@ cbs_full <- dplyr::select(cbs_full, names(cbs))
 
 # save results -----------------------------------------------
 if (write){
-  saveRDS(reex, file.path(out_dir, "reex.rds"))
   saveRDS(btd_final, file.path(out_dir, "btd_final.rds"))
   saveRDS(cbs_full, file.path(out_dir, "cbs_full.rds"))
 }

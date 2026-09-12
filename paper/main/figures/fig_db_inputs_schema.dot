@@ -1,0 +1,158 @@
+digraph soyprint_db {
+  graph [rankdir=LR, splines=spline, nodesep=0.45, ranksep=1.1, newrank=true, compound=true, fontname="Helvetica", fontsize=11, labelloc=t, label="SOYPRINT input database (soyprint.duckdb, input_* tables). Cleaned inputs of pipeline steps 00–03, 2000–2023, hive-partitioned by year in the Parquet layer."];
+  node [shape=plain, fontname="Helvetica", fontsize=9];
+  edge [color="#31538f", penwidth=0.9, dir=both, arrowtail=crowodot, arrowhead=teetee, arrowsize=0.7];
+  subgraph cluster_0 {
+    label="Dimensions"; fontsize=11; fontcolor="#31538f"; color="#31538f"; style=dashed; margin=10;
+  dim_municipality [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_municipality</B>  <FONT POINT-SIZE="8" COLOR="#555555">5,572 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="co_mun">co_mun</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="co_mun_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="nm_mun">nm_mun</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="nm_mun_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="co_state">co_state</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="co_state_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="nm_state">nm_state</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="nm_state_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="lon">lon</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="lon_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="lat">lat</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="lat_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="biome">biome</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="biome_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="matopiba">matopiba</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">bool</FONT></TD><TD ALIGN="LEFT" PORT="matopiba_e"> </TD></TR>
+    </TABLE>>];
+  dim_soy_product [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_soy_product</B>  <FONT POINT-SIZE="8" COLOR="#555555">3 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="product">product</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="product_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="hs4">hs4</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="hs4_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="fabio_item_code">fabio_item_code</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="fabio_item_code_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="description">description</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="description_e"> </TD></TR>
+    </TABLE>>];
+  dim_country [color="#31538f", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#dbe6f4" ALIGN="LEFT"><B>dim_country</B>  <FONT POINT-SIZE="8" COLOR="#555555">267 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="iso3c">iso3c</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="iso3c_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="name">name</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="name_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="continent">continent</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="continent_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="region">region</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="region_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="eu27">eu27</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">bool</FONT></TD><TD ALIGN="LEFT" PORT="eu27_e"> </TD></TR>
+    </TABLE>>];
+  }
+  subgraph cluster_1 {
+    label="Grand municipal input (step 00)"; fontsize=11; fontcolor="#3d7337"; color="#3d7337"; style=dashed; margin=10;
+  input_municipality [color="#3d7337", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#dcebd7" ALIGN="LEFT"><B>input_municipality</B>  <FONT POINT-SIZE="8" COLOR="#555555">133,468 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="co_mun">co_mun</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="co_mun_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="area_plant">area_plant</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="area_plant_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="area_harv">area_harv</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="area_harv_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="prod_bean">prod_bean</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="prod_bean_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="exp_bean">exp_bean</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="exp_bean_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="exp_bean_d">exp_bean_d</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="exp_bean_d_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="exp_oil">exp_oil</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="exp_oil_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="exp_oil_d">exp_oil_d</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="exp_oil_d_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="exp_cake">exp_cake</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="exp_cake_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="exp_cake_d">exp_cake_d</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="exp_cake_d_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="imp_bean">imp_bean</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="imp_bean_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="imp_bean_d">imp_bean_d</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="imp_bean_d_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="imp_oil">imp_oil</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="imp_oil_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="imp_oil_d">imp_oil_d</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="imp_oil_d_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="imp_cake">imp_cake</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="imp_cake_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="imp_cake_d">imp_cake_d</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="imp_cake_d_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="proc_fac">proc_fac</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="proc_fac_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="proc_cap">proc_cap</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="proc_cap_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="ref_fac">ref_fac</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="ref_fac_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="ref_cap">ref_cap</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="ref_cap_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="bot_cap">bot_cap</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="bot_cap_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="population">population</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="population_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="cattle">cattle</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="cattle_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="cattle_milked">cattle_milked</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="cattle_milked_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="buffalo">buffalo</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="buffalo_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="horse">horse</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="horse_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="pig">pig</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="pig_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="pig_mother">pig_mother</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="pig_mother_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="goat">goat</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="goat_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="sheep">sheep</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="sheep_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="chicken">chicken</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="chicken_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="chicken_layer">chicken_layer</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="chicken_layer_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="quail">quail</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="quail_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="storage_cap">storage_cap</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="storage_cap_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="oil_acq_pc">oil_acq_pc</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="oil_acq_pc_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="diesel_cap_soy">diesel_cap_soy</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="diesel_cap_soy_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="year">year</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="year_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    </TABLE>>];
+  }
+  subgraph cluster_2 {
+    label="Trade & commodity balance (steps 00, 04)"; fontsize=11; fontcolor="#b26a12"; color="#b26a12"; style=dashed; margin=10;
+  input_trade [color="#b26a12", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#fbe5c9" ALIGN="LEFT"><B>input_trade</B>  <FONT POINT-SIZE="8" COLOR="#555555">49,044 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="co_mun">co_mun</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="co_mun_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="product">product</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="product_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="flow">flow</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="flow_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="partner_iso3">partner_iso3</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="partner_iso3_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="partner_comex">partner_comex</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="partner_comex_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="hs4">hs4</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="hs4_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="tonnes">tonnes</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="tonnes_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="value_usd">value_usd</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="value_usd_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="year">year</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="year_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    </TABLE>>];
+  input_cbs_national [color="#b26a12", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#fbe5c9" ALIGN="LEFT"><B>input_cbs_national</B>  <FONT POINT-SIZE="8" COLOR="#555555">72 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="product">product</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="product_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="domestic_supply">domestic_supply</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="domestic_supply_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="production">production</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="production_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="export">export</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="export_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="import">import</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="import_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="food">food</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="food_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="feed">feed</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="feed_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="seed">seed</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="seed_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="other">other</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="other_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="processing">processing</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="processing_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="stock_withdrawal">stock_withdrawal</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="stock_withdrawal_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="stock_addition">stock_addition</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="stock_addition_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="dom_supply_side">dom_supply_side</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="dom_supply_side_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="dom_use_side">dom_use_side</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="dom_use_side_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="year">year</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="year_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    </TABLE>>];
+  input_faostat_trade [color="#b26a12", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#fbe5c9" ALIGN="LEFT"><B>input_faostat_trade</B>  <FONT POINT-SIZE="8" COLOR="#555555">2,333 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="year">year</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="year_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="product">product</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="product_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="flow">flow</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="flow_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="partner_iso3">partner_iso3</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="partner_iso3_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="partner_name">partner_name</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="partner_name_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="tonnes">tonnes</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="tonnes_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="value_kusd">value_kusd</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="value_kusd_e"> </TD></TR>
+    </TABLE>>];
+  }
+  subgraph cluster_3 {
+    label="Livestock & feed (steps 02–03)"; fontsize=11; fontcolor="#a03232"; color="#a03232"; style=dashed; margin=10;
+  input_livestock_systems [color="#a03232", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#f4d7d7" ALIGN="LEFT"><B>input_livestock_systems</B>  <FONT POINT-SIZE="8" COLOR="#555555">2,328,626 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="co_mun">co_mun</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="co_mun_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="animal">animal</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="animal_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="heads">heads</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="heads_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="year">year</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="year_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    </TABLE>>];
+  input_feed [color="#a03232", label=<
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="3">
+    <TR><TD COLSPAN="3" BGCOLOR="#f4d7d7" ALIGN="LEFT"><B>input_feed</B>  <FONT POINT-SIZE="8" COLOR="#555555">1,281,360 rows</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="co_mun">co_mun</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="co_mun_e"><FONT COLOR="#777777">pk fk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="animal">animal</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">text</FONT></TD><TD ALIGN="LEFT" PORT="animal_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="feed_bean_t">feed_bean_t</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="feed_bean_t_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="feed_cake_t">feed_cake_t</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">double</FONT></TD><TD ALIGN="LEFT" PORT="feed_cake_t_e"> </TD></TR>
+    <TR><TD ALIGN="LEFT" PORT="year">year</TD><TD ALIGN="LEFT"><FONT COLOR="#333333">int</FONT></TD><TD ALIGN="LEFT" PORT="year_e"><FONT COLOR="#777777">pk</FONT></TD></TR>
+    </TABLE>>];
+  }
+  input_municipality:co_mun_e:e -> dim_municipality:co_mun:w;
+  input_trade:co_mun_e:e -> dim_municipality:co_mun:w;
+  input_trade:product_e:e -> dim_soy_product:product:w;
+  input_trade:partner_iso3_e:e -> dim_country:iso3c:w;
+  input_cbs_national:product_e:e -> dim_soy_product:product:w;
+  input_livestock_systems:co_mun_e:e -> dim_municipality:co_mun:w;
+  input_feed:co_mun_e:e -> dim_municipality:co_mun:w;
+  input_faostat_trade:product_e:e -> dim_soy_product:product:w;
+  input_faostat_trade:partner_iso3_e:e -> dim_country:iso3c:w;
+  input_municipality -> input_trade [style=invis];
+  input_municipality -> input_livestock_systems [style=invis];
+}

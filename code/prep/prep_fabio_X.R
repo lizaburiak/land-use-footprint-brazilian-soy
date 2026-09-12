@@ -3,7 +3,7 @@
 # since the uploaded FABIO v2 data has Z/Y/E but not X. X is what step 17 needs to
 # build the Leontief inverse (A = Z / X; it does NOT use Y in the math).
 #
-# Output: data/fabio/v2/X.rds  — matrix [process x year], columns named by year
+# Output: data/fabio/v2/X.rds  - matrix [process x year], columns named by year
 #         (the layout step 17 reads as X[, as.character(year)]).
 #
 # Usage: Rscript code/prep/prep_fabio_X.R

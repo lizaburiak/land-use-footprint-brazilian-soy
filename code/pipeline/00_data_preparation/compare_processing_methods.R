@@ -11,10 +11,10 @@
 #
 # NEW METHOD (this script, applied per year):
 #   - Read ABIOVE_raw_capacity_2025.xlsx:
-#       * sheet 2 "2.Evolução"              → state capacity t/day for ANY year
+#       * sheet 2 "2.Evolução"              -> state capacity t/day for ANY year
 #                                              1989-2025 (continuous 2000-2020,
 #                                              gaps at 1990-94, 96, 2021)
-#       * sheet 3 "3.Unidades de Processamento" → plant list with status 2024+2025
+#       * sheet 3 "3.Unidades de Processamento" -> plant list with status 2024+2025
 #   - For each target year:
 #       1. Filter plant list to plants that process soy AND are 'Ativa' that year
 #       2. Read state capacity (Ativa column) for that year from sheet 2
@@ -23,9 +23,9 @@
 #
 # TEMPORAL NOTE:
 #   Sheet 3 of the 2025 file only has status columns for 2024 and 2025.
-#   Plants do change over time — a plant "Ativa" in 2024 may be "Parada" in 2025.
+#   Plants do change over time - a plant "Ativa" in 2024 may be "Parada" in 2025.
 #   This script respects that: the plant roster is filtered per year.
-#   For years <2024 the 2025 file cannot tell us which plants existed — this
+#   For years <2024 the 2025 file cannot tell us which plants existed - this
 #   script reports state-level only for those years (plant list = NA).
 #
 # OUTPUTS:
@@ -60,9 +60,9 @@ STEFAN_FILE      <- "archive/data_stefan_2013/Processing_facilities_2013_ABIOVE.
 
 
 #===============================================================================
-# OLD METHOD — Stefan's pre-computed 2013 output
+# OLD METHOD - Stefan's pre-computed 2013 output
 #===============================================================================
-cat("─── OLD (Stefan 2013) ───\n")
+cat("--- OLD (Stefan 2013) ---\n")
 
 old_proc_mun <- openxlsx::read.xlsx(STEFAN_FILE, sheet = "processing_MUN",
                                     colNames = TRUE) %>%
@@ -82,7 +82,7 @@ cat("  Municípios:", nrow(old_proc_mun),
 
 
 #===============================================================================
-# NEW METHOD — equal allocation from ABIOVE_raw_capacity_2025
+# NEW METHOD - equal allocation from ABIOVE_raw_capacity_2025
 #===============================================================================
 
 # Decode sheet 2 column layout (Ativa/Parada/Total per year).
@@ -134,7 +134,7 @@ get_plant_list <- function(year) {
   pl <- openxlsx::read.xlsx(ABIOVE_2025_FILE,
                              sheet = "3.Unidades de Processamento",
                              startRow = 8, colNames = TRUE)
-  # R drops the leading blank column A → 13 columns.
+  # R drops the leading blank column A -> 13 columns.
   # Rename positionally to avoid HTML-entity encoded accents in auto-names.
   stopifnot(ncol(pl) == 13)
   names(pl) <- c("Empresas","Municipio","UF","Regiao","st_2025","st_2024",
@@ -204,7 +204,7 @@ apply_equal_allocation <- function(year) {
 # Run new method for the years we can fully compute (2024, 2025)
 # Also produce state-only for earlier years to show the ABIOVE state totals.
 #===============================================================================
-cat("─── NEW (ABIOVE_raw_capacity_2025 + equal allocation) ───\n")
+cat("--- NEW (ABIOVE_raw_capacity_2025 + equal allocation) ---\n")
 
 new_results <- list()
 for (y in c(2024, 2025)) {
@@ -223,7 +223,7 @@ cat("  2013 ABIOVE state_cap total (Ativa) =",
 # COMPARISON 1: National totals
 #===============================================================================
 cat("═══════════════════════════════════════════════════════════════\n")
-cat("COMPARISON — NATIONAL TOTALS (t/day)\n")
+cat("COMPARISON - NATIONAL TOTALS (t/day)\n")
 cat("═══════════════════════════════════════════════════════════════\n")
 
 nat_tbl <- bind_rows(
@@ -249,7 +249,7 @@ write.csv(nat_tbl, file.path(OUT_DIR, "compare_national_total.csv"), row.names =
 # COMPARISON 2: State-level
 #===============================================================================
 cat("═══════════════════════════════════════════════════════════════\n")
-cat("COMPARISON — STATE TOTALS (top 10 states by Stefan 2013)\n")
+cat("COMPARISON - STATE TOTALS (top 10 states by Stefan 2013)\n")
 cat("═══════════════════════════════════════════════════════════════\n")
 
 stefan_by_state <- old_proc_mun %>%
@@ -293,7 +293,7 @@ write.csv(state_cmp, file.path(OUT_DIR, "compare_proc_cap_state.csv"),
 # COMPARISON 3: Município-level (top 20 municípios by Stefan 2013)
 #===============================================================================
 cat("═══════════════════════════════════════════════════════════════\n")
-cat("COMPARISON — TOP 20 MUNICÍPIOS (t/day, Stefan 2013 ranking)\n")
+cat("COMPARISON - TOP 20 MUNICÍPIOS (t/day, Stefan 2013 ranking)\n")
 cat("═══════════════════════════════════════════════════════════════\n")
 
 # openxlsx returns Portuguese accented chars as HTML entities like "Cuiab&#225;"

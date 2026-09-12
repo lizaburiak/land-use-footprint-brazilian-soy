@@ -7,6 +7,66 @@ Minimal-delta forks of Stefan Trsek's 2013 pipeline, adapted to run year-paramet
 - Outputs: `results/outputs/NN/` → `results/outputs/NN_{YEAR}/`.
 - Year: passed as `commandArgs(trailingOnly=TRUE)[1]`, default 2013. Range 2000–2022.
 
+## Step-00 dedup vs strsek/soyprint baseline (2026-08-18)
+Checked against Stefan's original repo (github.com/strsek/soyprint): steps 01-21 +
+checks + function library now total 5,989 lines vs his 5,867 (+122, the year
+parameterization / v1.1-v2 seam / bug fixes). Step 00 is the one real outlier
+(1,221 vs 463) because it ingests every source across 2000-2025 format eras where
+Stefan read one pre-cleaned 2013 vintage. Deduplicated it 1,424 → 1,221 lines:
+- one generic `.abiove_state_sector_cap()` (Processamento/Refino/Envase) replaces
+  the separate `.abiove_state_cap()`;
+- one generic roster parser trio (`.parse_roster_{early,mid,new}`) + `.abiove_roster()`
+  dispatcher replaces the six near-duplicate processing/refining parsers and both
+  per-sector year resolvers; sector differences are arguments (flag-column pattern,
+  sheet patterns, early-era column layout);
+- removed the never-called `.decode_html_entities()`.
+Verified: reran step 00 for 2003/2010/2013/2019/2022 (early/mid/new eras) —
+SOY_MUN_00, EXP_MUN_SOY_00, IMP_MUN_SOY_00 all bit-identical to pre-refactor outputs.
+
+## Dead-code trim: pipeline reduced to the paper-result path (2026-08-18)
+Everything cut is recoverable from git history (and `backup_code_2026-08-18.tar.gz`).
+- **Deleted files:** `07_transport_GAMS_parallel.R` (superseded by `transport_lp/`,
+  Pyomo+HiGHS), `09_sensitivity.R` (superseded by `code/analysis/sens_inputs.sh`).
+- **11_analyse_benchmarks.R** — rewritten to produce ONLY the five metric CSVs the paper
+  consumes (`pearson_global`, `rmse_global`, `rmsle_global`, `pearson_by_dest`,
+  `rmse_rmsle_by_dest`). Dropped: per-destination benchmark maps, scatter panels
+  (paper scatter is `code/analysis/rocket_plot.py`), R² regression blocks, `.tex` tables.
+  Verified: 2019 rerun reproduces all five CSVs bit-identically.
+- **10_create_benchmarks.R** — dropped unused `comp_list` variants (`mun_by_region`,
+  `state_by_region`), `export_summary_sorted.tex`, and the unsaved "data check 2" block.
+- **05_balancing.R** — removed the legacy `STOCK_MODE=use_prop` branch;
+  supply-side stock handling (the verified, canonical mode) is now unconditional.
+- **00_function_library.R** — reduced to `ci_funct`, `burn_rast`, `gplot_data`
+  (all map/scatter plot helpers removed with their step-11 callers).
+- **code/shared/fabio_tidy_functions.R** — reduced to the four used helpers
+  (`dt_replace`, `na_sum`, `replace_RoW`, `split_tcf`).
+- Small cuts: 04 (unused `EXP_SOY`/`IMP_SOY` check objects, diagnostic `btd_*_BRA_soy.rds`
+  + `regions.csv` writes), 12 (unread `reex.rds`), 13/16/18 (large commented-out legacy
+  blocks), 14 (dead commented line), 20 (`X <- X`, commented wrapper), 21 (commented
+  example block).
+- NOT touched on purpose: `14_use.R` sequential feed-req transforms (look duplicated but
+  compose), step-06 intermediate raster/gpkg writes (GDAL needs file paths),
+  `21_probability_maps.R` `is.finite.data.frame` (S3-dispatched by `is.finite(<df>)`),
+  all `SOYPRINT_FORCE_V11` and `SENS_*`/`MC_*` env-var hooks (used by `run_xcheck_v11.sh`
+  and `code/analysis/sens_inputs.sh`).
+
+## Pre-2010 years: FABIO v1.1 input switches (2026-07-24)
+The FABIO v2 build only exists for 2010+ (branch `data-2010-current`; verified on the WU
+server). For `YEAR < 2010`, steps switch to the v1.1 build fetched from
+`/mnt/nfs_fineprint/tmp/fabio/v1.1/` into `data/fabio/v1.1/` (see
+`data/fabio_before_2010/README.md`):
+- **12_re-exports.R** — btd: uses `trade/FABIO_exp/v1/btd_bal.rds` (1986–2013) instead of
+  `trade/new/btd_bal.RData` (2010–2023). cbs: uses `trade/FABIO_exp/v1/cbs_full.rds`
+  (1961–2019) — the new cbs_full HAS pre-2010 rows but they are degenerate placeholders
+  (production==feed; imports/exports/processing/food all 0 through 2009), which dumped all
+  trade into stock_addition and collapsed the 2005 footprint to 1 Mha on the first pilot.
+- **13_supply.R** — btd_full: `data/fabio/v1.1/btd_full.rds` (1986–2019; same 10-col schema,
+  units already `head`).
+- **14_use.R** — optim results: `data/fabio/v1.1/optim_results_2021-03-21.rds` (1961–2019).
+- **20_footrpints.R** — E: `data/fabio/v1.1/E.rds` (1986–2013, long table). New branch maps
+  its `landuse` column into the per-process vector via FAO item_code → v2 comm_code
+  (comm_codes are offset between v1.1 and v2; item_codes are stable).
+
 ---
 
 ## 00_data_preparation.R (now in code/pipeline/00_data_preparation/)
@@ -268,3 +328,44 @@ Steps 13–21 (supply, use, MRSUT, MRIO, Leontief, hybrid, footprints, probabili
 External requirements that still block end-to-end runs for `YEAR ≥ 2014`:
 1. **Updated FABIO_exp v1/pure** data at `data/new/04/FABIO/FABIO_exp/{v1,pure}/btd_bal.rds` and `cbs_full.rds` covering the target year.
 2. **Year-specific TRASE export** at `data/old/BRAZIL_SOY_{YEAR}_TRASE.csv` (10/11 fall back to the 2013 baseline if missing).
+
+## 2026-07-28: conservation checks now halt the pipeline (00_checks.R)
+
+The mass-conservation diagnostics scattered across the pipeline were printed
+(`all.equal` at top level) or silently discarded (`all.equal` inside loops /
+functions), and step 01 compared floats with `==`. A failed check therefore
+never stopped a run. All of them now go through `assert_equal()` in the new
+`code/pipeline/00_checks.R` (no package dependencies), which stops with an
+informative message on failure and prints `check ok [label]` on success.
+
+- **01**: the eight `==` printouts became halting asserts (crush, oil/cake
+  output, food bean/oil, biodiesel, seed, stock). Oil/cake are asserted
+  against crush x conversion factor so they also hold under
+  `MC_OILSHARE_DELTA` sensitivity runs.
+- **02**: the four herd-partition checks assert with `warn_only = TRUE`
+  (missing IBGE inputs, e.g. NA layer counts, legitimately put NAs on the
+  split side; the negative-herd guard below them already warns).
+- **03**: bean/cake feed vs national FAO feed — hard assert.
+- **05**: post-rescale municipal aggregates vs national FAO totals — hard
+  assert.
+- **08 (mean + sep)**: flow-matrix margins vs total supply/use and surpluses/
+  deficits, and export-total preservation — hard asserts with
+  `tolerance = 2e-3` (step 07 rescales the larger transport margin by up to
+  ~0.1% after dropping non-geographic nodes). The duplicate margin re-check
+  in 08_mean was removed.
+- **12**: per-item re-export balance (colSums = dom_use, rowSums =
+  dom_supply) — hard assert with `tolerance = 1e-4` for items inverted by the
+  primary sparse solver; items in `reex_singular` (ridge / pseudo-inverse
+  fallback) keep the printed diagnostic, since their balance is approximate
+  by construction. The 1e-4 tolerance is empirical: soybean oil (item 2571)
+  is heavily re-exported, so (I - R) is poorly conditioned and the 2013
+  margins carry ~2.3e-5 solver noise even on the successful sparse path —
+  the first thing the new halting checks caught.
+- **15/16**: supply/use dimension+name conformity — `stopifnot(identical())`.
+- **16**: in-loop transactions+final-demand = total-supply balance — hard
+  assert (was invisible inside the `for` loop).
+- **18**: Other-use preservation under hybridization — hard asserts (were
+  invisible inside the function).
+
+Verified on 2013: steps 01, 03, 05, 08_mean and 12 run end-to-end with all
+checks passing.

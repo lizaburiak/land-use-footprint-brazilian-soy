@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("data/fabio/v2/inst")) == 0) {
@@ -21,8 +11,6 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 library(Matrix)
 library(data.table)
@@ -40,6 +28,26 @@ library(viridis)
 
 # load function library
 source("code/pipeline/00_function_library.R")
+
+# raster spills full-tile intermediates to uncompressed temp files that live
+# until the session ends; 85 tiles x 17 targets overflows the disk. Give each
+# worker its own tmpdir, dropped right after the tile is written, and cap the
+# worker count (each holds a full 30m tile in RAM).
+MC_CORES <- 4  # 6 workers OOM-killed a forked child on the 16GB laptop; each holds a full 30m tile
+# mclapply swallows worker errors and returns try-error objects; fail loudly instead
+stop_on_worker_error <- function(res) {
+  bad <- Filter(function(z) inherits(z, "try-error"), res)
+  if (length(bad)) stop("burn_rast worker failed: ", as.character(bad[[1]]), call. = FALSE)
+  res
+}
+burn_rast_tmpsafe <- function(x, ...) {
+  tdir <- file.path(tempdir(), paste0("rtmp_", x, "_", Sys.getpid()))
+  dir.create(tdir, showWarnings = FALSE)
+  raster::rasterOptions(tmpdir = tdir)
+  out <- burn_rast(...)
+  unlink(tdir, recursive = TRUE)
+  out
+}
 
 # prepare footprint results ----------------------------------
 
@@ -64,7 +72,7 @@ GEO_MUN_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_
 GEO_states <- st_read("data/geo/GADM_boundaries/gadm36_BRA_1.shp", stringsAsFactors = FALSE) %>% st_transform(crs = 4326)
 
 
-# helper function (add to library)
+# S3 method: makes is.finite() work on the data.frames below (base errors on lists)
 is.finite.data.frame <- function(obj){
   sapply(obj,FUN = function(x) (is.finite(x)))
 }
@@ -116,51 +124,53 @@ names(tiles) <- tile_names
 # prob_tile1 <- burn_rast(rast = tiles[[1]], poly = GEO_MUN_SOY, value = "co_state", class = 1, file = "prob_tile1.tif")
 # mapview(prob_tile1)
 
-for (reg in c("DEU", "CHN", "ESP")) {  # 
-  for(type in c("meat-dairy-eggs")) { #"food", "nonfood" #"meat", "meat_dairy", 
-    for(alloc in c("mass")) { # "value", 
-      
-      # # select final demand region
-      # reg <- "CHN"
-      # # select food/nonfood
-      # type <- "food"
-      # # select allocation method
-      # alloc <- "mass"
-      # #or: select product
-      # prod <- "c101"
-      
+# Destination-group maps: the SAME five groups as all other figures
+# (see code/prep/prep_map_allyears.R and code/analysis/figstyle.py):
+# China | EU-27 | Rest of Asia | Rest of world | Brazil (domestic).
+# These five (value allocation) plus total_food/total_nonfood below are the
+# ONLY probability maps we produce. Single small countries (DEU, ESP, ...)
+# are pointless here: their per-municipality shares are <0.5% everywhere and
+# round to an empty map at the integer-percent resolution of the tiles.
+reg_tbl <- fread("data/fabio/v2/inst/regions_full.csv")
+eu27    <- reg_tbl$iso3c[reg_tbl$EU27 == TRUE]
+cont    <- setNames(reg_tbl$continent, reg_tbl$iso3c)
+grp_of  <- function(iso) ifelse(iso == "BRA", "Brazil-domestic",
+    ifelse(iso == "CHN", "China",
+    ifelse(iso %in% eu27, "EU-27",
+    ifelse(!is.na(cont[iso]) & cont[iso] == "ASI", "Rest-of-Asia", "Rest-of-world"))))
+
+for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domestic")) {
+    for(alloc in c("value")) { # "mass",
+
       geo <- if(alloc == "mass") GEO_MUN_P_mass else GEO_MUN_P_value
-      
-      if(reg == "EU") {
-        EU <- c("AUT", "BGR", "DNK", "FIN", "FRA", "DEU", "GRC", "HUN", "HRV", "IRL", "ITA", "MLT", "NLD", "CZE", "POL", "PRT", "ROU", "SVN", "SVK", "ESP", "SWE", "GBR", "BEL", "LUX", "LVA", "LTU", "EST", "CYP")
-        names(geo)[sub("_.*", "", names(geo)) %in% EU] <- paste0("EU_", sub(".*_", "", names(geo)[sub("_.*", "", names(geo)) %in% EU]))
-        mat <- as.matrix(st_drop_geometry(geo)[,which(names(st_drop_geometry(geo)) =="ARM_food"):ncol(st_drop_geometry(geo))])
-        sum_mat <- as(sapply(unique(colnames(mat)),"==",colnames(mat)), "Matrix")*1
-        mat <- mat %*% sum_mat
-        geo <- bind_cols(geo[,1:(which(names(geo) =="ARM_food")-1)], as.data.frame(as.matrix(mat)))
-      }
-      
-      # round to intergers
-      geo <- mutate(geo, across(ARM_food:last_col(), round))
-      
-      
+
+      # group probability = food + nonfood country columns summed over members
+      dat    <- st_drop_geometry(geo)
+      f_cols <- grep("^[A-Z]{3}_food$",    names(dat), value = TRUE)
+      n_cols <- grep("^[A-Z]{3}_nonfood$", names(dat), value = TRUE)
+      sel_f  <- f_cols[grp_of(sub("_food$",    "", f_cols)) == grp]
+      sel_n  <- n_cols[grp_of(sub("_nonfood$", "", n_cols)) == grp]
+      geo$grp_prob <- round(rowSums(dat[, sel_f, drop = FALSE]) +
+                            rowSums(dat[, sel_n, drop = FALSE]))
+
       # create directory
-      dir <- paste0("results/mb_tiles/",YEAR,"_",reg,"_",type,"_",alloc)
+      dir <- paste0("results/mb_tiles/",YEAR,"_",grp,"_",alloc)
       ifelse(!dir.exists(dir), dir.create(dir, recursive = TRUE), "Folder exists already")
-      target <- paste0(reg,"_",type)
+      target <- "grp_prob"
       
       if(length(dir(dir,all.files=FALSE)) == 0) {
         
         # apply to tile list 
         system.time(
           prob_tiles <- mclapply(names(tiles), function(x) {
-            burn_rast(rast = tiles[[x]], 
-                      poly = geo, 
+            burn_rast_tmpsafe(x, rast = tiles[[x]],
+                      poly = geo,
                       value = target, class = 1, zeroes = FALSE,
                       file = paste0(dir,"/",x))
-          }, mc.cores = 12)
+          }, mc.cores = MC_CORES)
         )
-        
+        prob_tiles <- stop_on_worker_error(prob_tiles)
+
         # build a vrt
         gdalUtilities::gdalbuildvrt(gdalfile = sapply(prob_tiles, filename), output.vrt = paste0(dir,"/prob.vrt"))
         prob_vrt <- raster(paste0(dir,"/prob.vrt"))
@@ -193,7 +203,7 @@ for (reg in c("DEU", "CHN", "ESP")) {  #
           #                    na.value = NA) +
           scale_fill_viridis(direction = -1)+ #limits = c(1,80)
           coord_sf(datum = sf::st_crs(prob_agg_vrt)) +
-          labs(fill = "probability", title = paste(reg, type, "consumption: land-use probability,", alloc, "allocation")) + 
+          labs(fill = "probability", title = paste(grp, "consumption: land-use probability,", alloc, "allocation")) + 
           theme_void()+
           theme(plot.title = element_text(hjust = 0.5, size = 10), 
                 plot.margin = margin(t = -0.0, r = -0.2, b = -0.1, l = -0.2, "cm"),
@@ -202,7 +212,7 @@ for (reg in c("DEU", "CHN", "ESP")) {  #
         #coord_quickmap()
       )
       
-      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_",reg,"_",type,"_",alloc,".png"), prob_map, width = 12, height = 10, units = "cm", scale = 2)
+      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_",grp,"_",alloc,".png"), prob_map, width = 12, height = 10, units = "cm", scale = 2)
       
       
       # for selected state
@@ -223,7 +233,7 @@ for (reg in c("DEU", "CHN", "ESP")) {  #
           #                    na.value = NA) +
           scale_fill_viridis(direction = -1)+ #limits = c(1,80)
           coord_sf(datum = sf::st_crs(prob_agg_vrt)) +
-          labs(fill = "probability", title = paste(reg, type, "consumption: land-use probability,", alloc, "allocation")) + 
+          labs(fill = "probability", title = paste(grp, "consumption: land-use probability,", alloc, "allocation")) + 
           theme_void()+
           theme(plot.title = element_text(hjust = 0.5, size = 10), 
                 plot.margin = margin(t = -0.0, r = -0, b = -0.1, l = -0.2, "cm"),
@@ -233,19 +243,18 @@ for (reg in c("DEU", "CHN", "ESP")) {  #
       )
       
       
-      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_state_",reg,"_",type,"_",alloc,".png"), prob_map_state, width = 12, height = 10, units = "cm", scale = 2)
-      
-      
+      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_state_",grp,"_",alloc,".png"), prob_map_state, width = 12, height = 10, units = "cm", scale = 2)
+
+
     }
-  }
 }
 
 
 
 # or by product
 
-for (prod in c("c110", "c114", "c116", "c117", "c118", "total_food", "total_nonfood")) { # 
-  for(alloc in c("mass", "value")){
+for (prod in c("total_food", "total_nonfood")) { # c110/c114/c116/c117/c118 dropped: codes are FABIO v1 numbering, in v2 they hit Butter/Mutton/Poultry/OtherMeat/Offals - remap before reusing
+  for(alloc in c("value")){ # "mass",
     
     # or: select product
     # prod <- "c101"
@@ -262,13 +271,14 @@ for (prod in c("c110", "c114", "c116", "c117", "c118", "total_food", "total_nonf
       # apply to tile list
       system.time(
         prob_tiles <- mclapply(names(tiles), function(x) {
-          burn_rast(rast = tiles[[x]], 
-                    poly = geo, 
+          burn_rast_tmpsafe(x, rast = tiles[[x]],
+                    poly = geo,
                     value = target, class = 1, zeroes = FALSE,
                     file = paste0(dir,"/",x))
-        }, mc.cores = 12)
+        }, mc.cores = MC_CORES)
       )
-      
+      prob_tiles <- stop_on_worker_error(prob_tiles)
+
       # build a vrt
       gdalUtilities::gdalbuildvrt(gdalfile = sapply(prob_tiles, filename), output.vrt = paste0(dir,"/prob.vrt"))
       prob_vrt <- raster(paste0(dir,"/prob.vrt"))

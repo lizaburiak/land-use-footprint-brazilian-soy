@@ -76,3 +76,4 @@ archive/broken_livestock_2014plus/
 
 # Stray input data staged under code/ — real inputs live in data/raw/ (git-ignored)
 code/inputs/
+backup_*.tar.gz

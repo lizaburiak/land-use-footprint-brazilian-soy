@@ -1,18 +1,8 @@
-# ============================================================================
-# REPRODUCTION PORT — FABIO MRIO / land-use footprint backend (steps 13-21).
-# Year-parameterized continuation of steps 00-12. Minimal-delta fork of the
-# matching archive/code_old_stefan/ script.
-#
-# REQUIRES WU/fineprint FABIO + EXIOBASE data that is NOT present on this
-# machine (see DATA.md):
-#   - data/generated/fabio/*                     (FABIO MRIO matrices)
-#   - archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/*   (concordances / tidy data)
-#   - /mnt/nfs_fineprint/tmp/{exiobase,fabio}/*      (EXIOBASE + FABIO v2, NFS)
-# These stages cannot run here without that infrastructure.
-# ============================================================================
+# FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
+# fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
+# EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
-# Fail fast with a clear message if none of the FABIO data is available.
 if (!dir.exists("/mnt/nfs_fineprint") &&
     length(list.files("data/generated/fabio")) == 0 &&
     length(list.files("data/fabio/v2/inst")) == 0) {
@@ -21,8 +11,6 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
        "See DATA.md.", call. = FALSE)
 }
-# NOTE: year-keyed file paths below are parameterized via YEAR, but full
-# year-extension is unvalidated until FABIO data is available to run against.
 
 ### multi-regional supply and use tables
 
@@ -422,10 +410,10 @@ sum_mat <- sum_mat[processes_fin_long,]
 # aggregate Brazilian national and municipal processes
 mr_use <- lapply(mr_use, function(x){x %*% sum_mat})
 
-# check conformity of dimensions with supply table
-dim(mr_use[[1]]) == rev(dim(mr_sup_mass[[1]]))
-all.equal(rownames(mr_sup_mass[[1]]), colnames(mr_use[[1]]))
-all.equal(colnames(mr_sup_mass[[1]]), rownames(mr_use[[1]]))
+# check conformity of dimensions with supply table (halt on mismatch)
+stopifnot(all(dim(mr_use[[1]]) == rev(dim(mr_sup_mass[[1]]))),
+          identical(rownames(mr_sup_mass[[1]]), colnames(mr_use[[1]])),
+          identical(colnames(mr_sup_mass[[1]]), rownames(mr_use[[1]])))
 
 
 # final demand use: re-aggregate stock_addition and stock_withdrawal

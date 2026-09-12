@@ -1,0 +1,5 @@
+run_xcheck_v11 (v11-only)  start=Fri 31 Jul 2026 22:54:23 CEST  years=2010 2011  FORCE=1
+----------------------------------------
+YEAR 2010: v11 SANE; canonical v2 restored (pristine)
+YEAR 2011: v11 SANE; canonical v2 restored (pristine)
+done=Sat  1 Aug 2026 00:04:09 CEST

@@ -19,11 +19,11 @@ soyprint/
 │       └── base/            ←     old-pipeline intermediates (live plotting deps)
 ├── code/                    ← all code
 │   ├── pipeline/            ←   the model, steps 00–21
-│   ├── analysis/            ←   paper figures/plots (footprint_*, plot_*, correlation_*, web)
+│   ├── analysis/            ←   paper figures/plots (fig_*, rocket_plot, plot_*, checks)
 │   ├── prep/                ←   data-prep feeders (prep_exiobase_*, prep_fabio_*, prep_map_*, …)
 │   ├── shared/              ←   helpers sourced by the pipeline (was R/auxiliary)
 │   ├── run_all.sh  run_year_full.sh  run_footprints.sh   ← pipeline + footprint runners
-│   └── download_data.py  aggregate_years.R               ← data + results tools
+│   └── download_data.py                                  ← data collection tool
 ├── results/                 ← terminal, human-facing outputs, grouped by purpose:
 │   ├── figures/             ←   paper/ footprint_dynamics/ sensitivity/ correlation_scatter/
 │   ├── maps/                ←   footprint_maps/ probability_maps/ benchmark_maps/ commodity_balance_maps/
@@ -57,10 +57,10 @@ transport.
 | Folder | What it is |
 |---|---|
 | `code/pipeline/` | **The model** — year-parameterized steps `00_*.R … 21_*.R` (year = `commandArgs[1]`, default 2013, range 2000–2022). Reads `data/raw/`, `data/geo/`, `data/trase/`, `data/fabio/`, writes `data/generated/outputs/NN_{YEAR}/`. `00_data_preparation/` holds the rewritten step 00. See `code/pipeline/CHANGELOG.md`. |
-| `code/analysis/` | Paper figures & plots run *after* the pipeline: `footprint_*`, `plot_*`, `correlation_*`, `compare_*`, `fig_*`, `figstyle.py`, web builders. Read `results/`, write `results/figures/`. |
-| `code/prep/` | Data-prep feeders for the footprint chain & figures: `prep_exiobase_*`, `prep_fabio_X`, `prep_map_*`, `prep_web_data`, `prep_enduse_ha`. |
-| `code/shared/` | Helpers (`fabio_tidy_functions.R`, plotting/maps) sourced by the pipeline as `source("code/shared/...")`. |
-| `code/*.sh`, `*.py`, `*.R` (root) | Runners (`run_all`, `run_year_full`, `run_footprints`) + tools (`download_data.py`, `aggregate_years.R`). |
+| `code/analysis/` | Paper figures & plots run *after* the pipeline: `fig_*`, `rocket_plot.py`, `plot_*`, `compile_multimode_panel.R`, `sens_inputs*`, `check_*`, `figstyle.py`. Read `results/`, write `results/figures/`. |
+| `code/prep/` | Data-prep feeders for the footprint chain & figures: `prep_exiobase_*`, `prep_fabio_X`, `prep_map_*`, `prep_rocket_pairs`, `prep_enduse_ha`, `prep_mb_tiles`, `prep_ip_add`. |
+| `code/shared/` | Helpers (`fabio_tidy_functions.R`) sourced by the pipeline as `source("code/shared/...")`. |
+| `code/*.sh`, `*.py` (root) | Runners (`run_all`, `run_year_full`, `run_footprints`, `run_multimode_*`, `run_prob_maps_years`, `run_xcheck_v11`) + `download_data.py`. |
 | `archive/code_old_stefan/` | Stefan's unmodified 2013 thesis pipeline `00_*.R … 21_*.R`. Superseded by `code/pipeline/`; kept for provenance. |
 | `archive/code_python_scaffold/` | Partial Python port of the pipeline (steps 00–04 validated, rest scaffold). Not wired into any runner. |
 

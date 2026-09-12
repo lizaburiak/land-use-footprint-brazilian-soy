@@ -13,7 +13,6 @@ library(purrr)
 library(sf)
 library(gmodels)
 library(Metrics)
-library(xtable)
 
 
 write = TRUE
@@ -21,9 +20,7 @@ write = TRUE
 options(scipen = 9999)
 
 out_dir <- paste0("data/generated/outputs/10_", YEAR)
-tab_dir <- paste0("results/tables/benchmarks/", YEAR)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-dir.create(tab_dir, showWarnings = FALSE, recursive = TRUE)
 
 # load function library
 source("code/pipeline/00_function_library.R")
@@ -39,7 +36,7 @@ CBS_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/CBS_SOY_bal.rds"
 # TRASE loading + schema adapter ----------------------------------------------------------
 # Stefan's code was written for TRASE v2.5.1 (UPPERCASE column names).
 # trase.earth now publishes v2.6.1 (lowercase columns, no LAND_USE_HA in composite,
-# no separate ISO3 column — uses 2-letter trase_ids instead). Detect and remap.
+# no separate ISO3 column - uses 2-letter trase_ids instead). Detect and remap.
 .trase_year <- paste0("data/trase/BRAZIL_SOY_", YEAR, "_TRASE.csv")
 .trase_v25  <- "data/trase/BRAZIL_SOY_2.5.1_TRASE.csv"
 .trase_v26  <- "data/trase/brazil_soy_v2_6_1_composite.csv"
@@ -50,7 +47,7 @@ CBS_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/CBS_SOY_bal.rds"
 trase <- read.csv(.trase_path, stringsAsFactors = FALSE)
 
 if ("country_of_first_import" %in% colnames(trase) && !("COUNTRY" %in% colnames(trase))) {
-  # v2.6.1 schema — remap to v2.5.1 conventions Stefan's code expects
+  # v2.6.1 schema - remap to v2.5.1 conventions Stefan's code expects
   message("Detected TRASE v2.6.1 schema. Remapping columns to v2.5.1 conventions.")
   # Filter to year of interest if multi-year file
   if ("year" %in% colnames(trase) && length(unique(trase$year)) > 1) {
@@ -58,13 +55,13 @@ if ("country_of_first_import" %in% colnames(trase) && !("COUNTRY" %in% colnames(
     message("Filtered TRASE to YEAR=", YEAR, " (", nrow(trase), " rows)")
   }
   # TRASE composite covers 2004-2022. For earlier years there is nothing to
-  # benchmark against — skip cleanly (model outputs from steps 00-08 stay valid).
+  # benchmark against - skip cleanly (model outputs from steps 00-08 stay valid).
   if (nrow(trase) == 0) {
     message("[10] No TRASE data for YEAR=", YEAR,
-            " (composite covers 2004-2022). Skipping benchmark — model outputs are valid.")
+            " (composite covers 2004-2022). Skipping benchmark - model outputs are valid.")
     quit(save = "no", status = 0)
   }
-  # ISO2 → ISO3 lookup (inline, covers all TRASE destinations as of v2.6.1)
+  # ISO2 -> ISO3 lookup (inline, covers all TRASE destinations as of v2.6.1)
   .iso2to3 <- c(
     BR="BRA", AR="ARG", BO="BOL", CL="CHL", CO="COL", CR="CRI", CU="CUB", DO="DOM", EC="ECU",
     GT="GTM", HN="HND", JM="JAM", MX="MEX", NI="NIC", PA="PAN", PE="PER", PY="PRY", SV="SLV",
@@ -96,9 +93,9 @@ if ("country_of_first_import" %in% colnames(trase) && !("COUNTRY" %in% colnames(
   trase$SOY_EQUIVALENT_TONNES <- as.numeric(trase$volume)
   trase$TRASE_GEOCODE         <- trase$municipality_of_production_trase_id
   trase$LAND_USE_HA           <- NA_real_   # not in v2.6.1 composite; dropped downstream anyway
-  trase_names <- NULL  # not needed — we built ISOA3 directly from trase_id
+  trase_names <- NULL  # not needed - we built ISOA3 directly from trase_id
 } else {
-  # v2.5.1 schema — original code path
+  # v2.5.1 schema - original code path
   trase_names <- read.csv2("data/trase/trase_names.csv", fileEncoding = "UTF-8-BOM", stringsAsFactors = FALSE)
 }
 
@@ -111,7 +108,7 @@ if (file.exists(.list_path)) {
   if (length(source_to_export_list) > 1) source_to_export_list <- source_to_export_list[-1]
   source_to_export_list <- c(source_to_export_mean, source_to_export_list)
 } else {
-  message("No source_to_export_list.rds — running benchmark with mean version only.")
+  message("No source_to_export_list.rds - running benchmark with mean version only.")
   source_to_export_list <- source_to_export_mean
 }
 # Deduplicate by name (when bootstrap is absent, both _mean and _sep contribute "euclid")
@@ -167,7 +164,7 @@ downscale <- mutate(downscale, export = ifelse(product == "bean", export, export
 # prepare TRASE data ----------------------------------------------
 
 if (!is.null(trase_names)) {
-  # v2.5.1 path — original join
+  # v2.5.1 path - original join
   trase <- left_join(trase, trase_names, by = "COUNTRY") %>%
     relocate(ISOA3, .after = COUNTRY)
 }  # v2.6.1: ISOA3 was already populated above from country_of_first_import_trase_id
@@ -268,26 +265,20 @@ comp_state <- comp_mun[, lapply(.SD, sum, na.rm=TRUE),
                        by =.(co_state, nm_state, to_code, to_region),
                        .SDcols=c("trase", "downscale", names(results_list))]
 
-comp_mun_by_region <- comp_mun[, lapply(.SD, sum, na.rm=TRUE),
-                       by =.(co_mun, nm_mun, co_state, nm_state, to_region),
-                       .SDcols=c("trase", "downscale", names(results_list))]
-
-comp_state_by_region <- comp_state[, lapply(.SD, sum, na.rm=TRUE),
-                               by =.(co_state, nm_state, to_region),
-                               .SDcols=c("trase", "downscale", names(results_list))]
-
-
-comp_list <- list("mun" = comp_mun, "state" = comp_state, "mun_by_region" = comp_mun_by_region, "state_by_region" = comp_state_by_region)
+comp_list <- list("mun" = comp_mun, "state" = comp_state)
 
 
 comp_list <- lapply(comp_list, function(comp){
 
-  has_bootstrap <- "00001" %in% colnames(comp)
+  # simulation columns are named after the bs iteration files ("00000", "00001", …);
+  # Stefan hardcoded "00001", which breaks for a central-only run starting at "00000"
+  .sim_first <- grep("^[0-9]{5}$", colnames(comp))[1]
+  has_bootstrap <- !is.na(.sim_first)
 
   if (has_bootstrap) {
     # split simulation columns off and compute summary stats across bootstrap runs
-    comp_sim <- comp[,which(colnames(comp) == "00001"):ncol(comp)]
-    comp <- comp[,1:(which(colnames(comp) == "00001")-1)]
+    comp_sim <- comp[, .sim_first:ncol(comp)]
+    comp <- comp[, 1:(.sim_first - 1)]
 
     comp <- comp %>% mutate(mean = apply(as.matrix(comp_sim), 1, mean),
                                     min = apply(as.matrix(comp_sim), 1, min),
@@ -348,54 +339,9 @@ exp_by_dest <- exp_by_dest %>% mutate(across(c(downscale:mean),
                                          diff_comex = ~ abs(.-comex)),
                              .names = "{.fn}_{.col}"))
 
-exp_by_dest_region <- exp_by_dest %>%
-  group_by(to_region) %>%
-  summarise(across(all_of(res), sum, na.rm = TRUE), .groups = "drop")
-
+# log-only sanity totals
 (exp_total <- sapply(filter(exp_by_dest, to_code != "BRA")%>%dplyr::select(c(trase:mean, comex, starts_with("diff_"))), sum, na.rm = TRUE))
 (flow_total <- sapply(dplyr::select(exp_by_dest, c(trase:mean, comex, starts_with("diff_"))), sum, na.rm = TRUE))
-
-trase_exp_known <- trase_mun %>% filter(co_mun != 9999999) %>% group_by(to_code) %>% summarise(trase_known = sum(trase))
-exp_summary <- exp_by_dest %>% dplyr::select(c(to_code:trase, comex, euclid, multimode_mean, bean, oil, cake)) %>%
-  left_join(trase_exp_known)
-
-exp_summary <- exp_summary %>% dplyr::select(to_code, to_name, trase, trase_known, euclid, multimode_mean, comex, bean, oil, cake)
-exp_summary <- exp_summary %>% mutate(across(where(is.numeric), ~replace_na(.x, 0)))
-exp_summary <- arrange(exp_summary, desc(comex))
-exp_summary <- mutate(exp_summary, across(trase:cake, function(x){x/1000}))
-
-exp_summary <- rbind(exp_summary, "Total" = c(NA, NA, colSums(exp_summary[,3:ncol(exp_summary)])))
-
-print(xtable(exp_summary, caption = "Eport summary",digits = 3),
-      file = file.path(tab_dir, "export_summary_sorted.tex"),
-      include.rownames=FALSE)
-
-# data check 2: compare total flows by MU to production ------------------------------------------------------------
-
-comp_mun_total <- comp_list$mun %>%
-  dplyr::select(c(co_state:trase, downscale:mean)) %>%
-  group_by(co_state, nm_state, co_mun, nm_mun) %>%
-  summarise(across(c(trase, downscale:mean), sum, na.rm = TRUE), .groups = "drop")
-
-comp_mun_total <- full_join(comp_mun_total,
-                            dplyr::select(SOY_MUN, c(co_mun, prod_bean)),
-                            by = "co_mun")
-comp_mun_total <- comp_mun_total %>%
-  dplyr::select(-c(nm_mun, co_state, nm_state)) %>%
-  left_join(SOY_MUN[,1:4], by = "co_mun") %>%
-  relocate(nm_mun, .after = co_mun) %>%
-  relocate(c(co_state, nm_state), .before = co_mun) %>%
-  mutate(co_state = ifelse(is.na(co_state), 99, co_state),
-         nm_state = ifelse(is.na(nm_state), "UNKNOWN", nm_state),
-         nm_mun = ifelse(is.na(nm_mun), "UNKNOWN", nm_mun))
-
-comp_mun_total <- comp_mun_total %>%
-  mutate(across(trase:prod_bean, ~replace_na(.x, 0)))
-
-comp_mun_total <- comp_mun_total %>%
-  mutate(across(c(trase, downscale:mean),
-                .fns = list(diff_trase = ~ .-trase,
-                            diff_prod = ~.-prod_bean)))
 
 #### write results --------------------------------------------------
 
