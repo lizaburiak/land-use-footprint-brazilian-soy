@@ -6,6 +6,9 @@
 
 ### 📄 Paper drafts (render in-browser): [**Data section**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/paper/data_section/data.pdf) · [**Methods section**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/paper/methods_section/methods.pdf)
 
+### 💾 [**Download the results database →**](https://drive.google.com/drive/folders/1RrzOPWyJePnxattB13CnMVdLt9UlbLrq?usp=sharing)
+All headline results in one place: `soyprint.duckdb` (every result table + analysis views, queryable from R/Python/DBeaver), Excel-friendly summary CSVs, and a README documenting each table. This is the fastest way to use the results without running the pipeline.
+
 ### Note for people interested in reproducing results:
 The model requires a wide range of input data for all modelling steps. All data is publicly and freely available, but cannot directly be provided here for download due to different copyright licenses. Instead, see [`DATA.md`](DATA.md) for the full manifest — where every dataset comes from and where it must be placed — plus the `code/download_data.py` script that programmatically fetches the auto-downloadable inputs straight into the pipeline's input tree. 
 
