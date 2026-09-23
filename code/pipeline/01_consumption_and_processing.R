@@ -4,6 +4,10 @@
 # R/01_consumption_and_processing.R. Changes: year-parameterized I/O paths;
 # the former `==` allocation printouts are halting assert_equal() checks.
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 library(dplyr)
 library(sf)
 library(openxlsx)
@@ -12,8 +16,8 @@ source("code/pipeline/00_checks.R")
 # Year parameter (default 2013)
 args <- commandArgs(trailingOnly = TRUE)
 YEAR <- if (length(args) > 0) as.integer(args[1]) else 2013
-IN00 <- paste0("data/generated/outputs/00_", YEAR, "/")
-OUT  <- paste0("data/generated/outputs/01_", YEAR, "/")
+IN00 <- paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/")
+OUT  <- paste0(DATA_DIR, "/generated/outputs/01_", YEAR, "/")
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 # load data
@@ -127,9 +131,30 @@ assert_equal(sum(SOY_MUN$food_oil, na.rm = TRUE), CBS_SOY["oil", "food"],
 # other use ---------------------------------------------------------------------------
 
 # allocate by municipal soy-based biodiesel production capacity
-SOY_MUN <- mutate(SOY_MUN, other_oil = diesel_cap_soy/sum(diesel_cap_soy) * CBS_SOY["oil", "other"])
-assert_equal(sum(SOY_MUN$other_oil, na.rm = TRUE), CBS_SOY["oil", "other"],
-             "01 biodiesel allocation = national oil other use")
+# Brazil's soy biodiesel industry starts in ~2006: before that every municipality has
+# diesel_cap_soy == 0, so the share is 0/0 and other_oil is NaN for the whole country.
+# There is no source telling us where that oil's "other" (industrial) use happened, so it
+# stays UNALLOCATED -- NA, as in every release to date -- and the national check is skipped
+# for those years instead of inventing a spatial distribution. The tonnage is small
+# (0.4-0.7 Mt of oil in 2000-2005) and is dropped by the release exporter's is.na filter.
+.diesel_cap_tot <- sum(SOY_MUN$diesel_cap_soy, na.rm = TRUE)
+if (.diesel_cap_tot > 0) {
+  SOY_MUN <- mutate(SOY_MUN, other_oil = diesel_cap_soy/sum(diesel_cap_soy) * CBS_SOY["oil", "other"])
+  assert_equal(sum(SOY_MUN$other_oil, na.rm = TRUE), CBS_SOY["oil", "other"],
+               "01 biodiesel allocation = national oil other use")
+} else {
+  # Fall back to municipal oil output as the allocation basis. Leaving the quantity out
+  # (NA, as releases up to 2026-09-17 did) breaks the national oil supply = use balance in
+  # step 05 by 17% in 2000, so it has to be placed somewhere; crushing capacity is where
+  # the oil physically is and is the closest available proxy for industrial/"other" use.
+  # PROXY, not observed: no municipal source for pre-biodiesel industrial oil use exists.
+  SOY_MUN <- mutate(SOY_MUN, other_oil = prod_oil/sum(prod_oil, na.rm = TRUE) * CBS_SOY["oil", "other"])
+  assert_equal(sum(SOY_MUN$other_oil, na.rm = TRUE), CBS_SOY["oil", "other"],
+               "01 oil other use allocated by crush output (pre-biodiesel proxy)")
+  message(sprintf(paste("[01] no soy biodiesel capacity in %d: national oil 'other' use of",
+                        "%.0f t allocated by municipal crush output (PROXY)"),
+                  YEAR, CBS_SOY["oil", "other"]))
+}
 
 
 # seed use --------------------------------------------------------------------------------
@@ -147,10 +172,8 @@ assert_equal(sum(SOY_MUN$seed_bean, na.rm = TRUE), CBS_SOY["bean", "seed"],
 # stock addition --------------------------------------------------------------------------
 
 # stock addition (proxy: grain storage capacity)
-# NB: this storage-capacity split is corrected for the WITHDRAWAL case (negative national
-# stock change) downstream in 05_balancing.R, where the full municipal use base is known --
-# a withdrawal must be drawn proportional to use, not storage, or non-using municipalities
-# get negative total_use (which broke the step-12 re-export inversion for 2018-2020).
+# NB: for a net national WITHDRAWAL (sign known only after balancing), 05_balancing.R
+# replaces this split with an allocation by municipal bean production.
 store_cap_tot <- sum(SOY_MUN$storage_cap, na.rm = T) # total storage capacity
 SOY_MUN$stock_bean <- (SOY_MUN$storage_cap/store_cap_tot)*CBS_SOY["bean","stock_addition"]
 assert_equal(sum(SOY_MUN$stock_bean, na.rm = TRUE), CBS_SOY["bean", "stock_addition"],

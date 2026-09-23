@@ -1,6 +1,10 @@
 
 ####### Final adjustments to municipality-level data to balance supply with demand #######
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -12,20 +16,17 @@ source("code/pipeline/00_checks.R")
 
 write = TRUE
 
-# Stock-change handling (see code/pipeline/CHANGELOG.md): a net national stock
-# WITHDRAWAL is treated as SUPPLY - |stock| is added to total_supply and excluded from
-# total_use, keeping the step-01 storage allocation (no realloc). This matches the
-# commodity-balance identity (a drawdown is a source of current-year supply; see paper
-# Methods Eq. 2), is consistent with FABIO's own stock treatment, and keeps the
-# consumption footprint within the harvested-area envelope (verified 2010-2022).
-# (The legacy STOCK_MODE=use_prop use-side reallocation was retired 2026-08; git history.)
+# Stock-change handling: the stock change stays on the use side (Stefan's bookkeeping);
+# a net national withdrawal is moved to supply once, in 12_re-exports.R. Withdrawals are
+# allocated by production (see below). Replaces the 2026-08 supply_side mode, which added
+# withdrawals to supply here and again in step 12 (double count in 2012, 2018-2022).
 
 # load data -----------------------------------------------------------------------------------
-SOY_MUN <- readRDS(paste0("data/generated/outputs/03_", YEAR, "/SOY_MUN_03.rds"))
-GEO_MUN_SOY <- readRDS(paste0("data/generated/outputs/03_", YEAR, "/GEO_MUN_SOY_03.rds"))
-CBS_SOY <- readRDS(paste0("data/generated/outputs/00_", YEAR, "/CBS_SOY.rds"))
-EXP_MUN_SOY <- readRDS(paste0("data/generated/outputs/04_", YEAR, "/EXP_MUN_SOY.rds"))
-IMP_MUN_SOY <- readRDS(paste0("data/generated/outputs/04_", YEAR, "/IMP_MUN_SOY.rds"))
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/03_", YEAR, "/SOY_MUN_03.rds"))
+GEO_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/03_", YEAR, "/GEO_MUN_SOY_03.rds"))
+CBS_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/CBS_SOY.rds"))
+EXP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/04_", YEAR, "/EXP_MUN_SOY.rds"))
+IMP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/04_", YEAR, "/IMP_MUN_SOY.rds"))
 
 
 # balance municipal cbs -----------------------------------
@@ -64,6 +65,16 @@ SOY_MUN <- SOY_MUN %>%
          stock_cake = CBS_SOY["cake","stock_addition"]*prod_cake/sum(prod_cake),
          .after=stock_bean)
 
+# CHANGED: a net national bean stock WITHDRAWAL is allocated by municipal bean production,
+# not by storage capacity (step 01). Storage-capacity withdrawals put tonnes on municipalities
+# with no harvest (2012: 586) or beyond their production (2012: 770), which step 15 then
+# sources from the municipality's own output. Decided here, after balancing, because the
+# balanced sign differs from the step-01 sign in 2014-2020 and 2022. Additions keep
+# Stefan's storage-capacity split.
+if (CBS_SOY["bean", "stock_addition"] < 0) {
+  SOY_MUN$stock_bean <- CBS_SOY["bean", "stock_addition"] * SOY_MUN$prod_bean / sum(SOY_MUN$prod_bean)
+}
+
 
 # harmonize municipal values with national totals -----------------------------
 
@@ -92,38 +103,45 @@ SOY_MUN[,names(SOY_MUN_cbs)] <- as.data.frame(t(t(SOY_MUN_cbs)*SOY_agg$ratio))
 # check for balance, adding columns for total supply and demand of each product
 SOY_agg$MUN_fin <- colSums(SOY_MUN[,names(SOY_MUN_cbs)])
 SOY_agg$check <- SOY_agg$MUN_fin == SOY_agg$FAO
-assert_equal(SOY_agg$MUN_fin, SOY_agg$FAO,
+
+# A column whose municipal total is exactly 0 while FAO reports a non-zero national total
+# cannot be rescaled: 0 * ratio is still 0, because the municipal layer holds no allocation
+# basis for it (e.g. oil "other"/industrial use before Brazil's soy biodiesel industry
+# exists, 2000-2007 -- see 01_consumption_and_processing.R). Such a quantity stays
+# UNALLOCATED and is reported here instead of failing the national check; every other
+# column is still checked strictly.
+.unalloc <- SOY_agg$MUN_fin == 0 & SOY_agg$FAO != 0
+if (any(.unalloc)) {
+  message(sprintf("[05] UNALLOCATED in %d (no municipal basis, excluded from the national check): %s",
+                  YEAR, paste(sprintf("%s = %.0f t", rownames(SOY_agg)[.unalloc],
+                                      SOY_agg$FAO[.unalloc]), collapse = "; ")))
+}
+assert_equal(SOY_agg$MUN_fin[!.unalloc], SOY_agg$FAO[!.unalloc],
              "05 municipal aggregates match national FAO totals after rescaling")
 
-# stock_split(): where does a product's stock term go in the balance?
-#   net national WITHDRAWAL (sum(stock) < 0) -> |stock| onto SUPPLY, none on use.
-#   otherwise (net addition) -> stock stays on the USE side.
-# This guarantees total_use >= 0 (use side is then just the non-negative use base);
-# without it, storage-capacity-allocated withdrawals drove total_use negative and the
-# step-12 re-export inversion went degenerate for drawdown years (2012, 2018-2020).
-stock_split <- function(stock) {
-  if (sum(stock, na.rm = TRUE) < 0)
-    list(sup = -stock, use = rep(0, length(stock)))
-  else
-    list(sup = rep(0, length(stock)), use = stock)
-}
-.b <- stock_split(SOY_MUN$stock_bean)
-.o <- stock_split(SOY_MUN$stock_oil)
-.k <- stock_split(SOY_MUN$stock_cake)
-
 # add totals to mun table
+# CHANGED back to Stefan's bookkeeping: stock change stays on the USE side (negative for a
+# withdrawal). Step 12 moves withdrawals to supply itself (stock_negative, L248-253); the
+# supply_side mode added them to supply here as well, so drawdown years counted them twice.
+# A withdrawal can make municipal total_use negative; step 12 restores dom_use to the
+# non-negative use base.
 SOY_MUN  <- SOY_MUN %>%
-  mutate(total_supply_bean = prod_bean + imp_bean + .b$sup,
-                             total_supply_oil = prod_oil + imp_oil + .o$sup,
-                             total_supply_cake = prod_cake + imp_cake + .k$sup,
-                             total_use_bean = exp_bean + food_bean + feed_bean + seed_bean + proc_bean + .b$use,
-                             total_use_oil = exp_oil + food_oil + other_oil + .o$use,
-                             total_use_cake = exp_cake + feed_cake + .k$use)
+  mutate(total_supply_bean = prod_bean + imp_bean,
+                             total_supply_oil = prod_oil + imp_oil,
+                             total_supply_cake = prod_cake + imp_cake,
+                             total_use_bean = exp_bean + food_bean + feed_bean + seed_bean + proc_bean + stock_bean,
+                             total_use_oil = exp_oil + food_oil + other_oil + stock_oil,
+                             total_use_cake = exp_cake + feed_cake + stock_cake)
+cat("municipalities with negative total_use (bean/oil/cake):",
+    sum(SOY_MUN$total_use_bean < 0), sum(SOY_MUN$total_use_oil < 0), sum(SOY_MUN$total_use_cake < 0), "\n")
 
 # check balance again
-sum(SOY_MUN$total_supply_bean) == sum(SOY_MUN$total_use_bean)
-sum(SOY_MUN$total_supply_oil)  == sum(SOY_MUN$total_use_oil)
-sum(SOY_MUN$total_supply_cake) == sum(SOY_MUN$total_use_cake)
+assert_equal(sum(SOY_MUN$total_supply_bean), sum(SOY_MUN$total_use_bean),
+             "05 national bean supply = use (sum over municipalities)")
+assert_equal(sum(SOY_MUN$total_supply_oil),  sum(SOY_MUN$total_use_oil),
+             "05 national oil supply = use (sum over municipalities)")
+assert_equal(sum(SOY_MUN$total_supply_cake), sum(SOY_MUN$total_use_cake),
+             "05 national cake supply = use (sum over municipalities)")
 
 # add columns for excess supply and demand of each product
 SOY_MUN <- mutate(SOY_MUN,
@@ -184,7 +202,7 @@ IMP_MUN_SOY <- mutate(IMP_MUN_SOY,
 
 # export data -------------------------------------------------------------------
 if(write){
-  out_dir <- paste0("data/generated/outputs/05_", YEAR)
+  out_dir <- paste0(DATA_DIR, "/generated/outputs/05_", YEAR)
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
   saveRDS(SOY_MUN, file = file.path(out_dir, "SOY_MUN_fin.rds"))

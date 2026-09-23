@@ -12,6 +12,10 @@
 # - sparse matrix to data.table reshaping is made more efficient
 # - calculations year-parameterized via YEAR (was: restricted to 2013)
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -27,19 +31,19 @@ source("code/pipeline/00_checks.R")
 
 write = TRUE
 
-out_dir <- paste0("data/generated/outputs/12_", YEAR)
+out_dir <- paste0(DATA_DIR, "/generated/outputs/12_", YEAR)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # load data ---------------------------------------------------------------
 
-SOY_MUN <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
 soy_items <- c("bean" = 2555, "oil" = 2571, "cake" = 2590)
 
 # BTD. Per Martin Bruckner (WU Vienna), the new multi-year btd_bal.RData (2010-2023)
 # can be used in place of all three legacy variants (regular, FABIO_exp v1, FABIO_exp pure).
 # Prefer it when available; fall back to Stefan's 2013-pinned snapshot otherwise.
-.btd_new_path <- "data/fabio/trade/new/btd_bal.RData"
-.btd_old_path <- "data/fabio/trade/FABIO_exp/v1/btd_bal.rds"
+.btd_new_path <- file.path(DATA_DIR, "fabio/trade/new/btd_bal.RData")
+.btd_old_path <- file.path(DATA_DIR, "fabio/trade/FABIO_exp/v1/btd_bal.rds")
 # PRE-2010: the new file only covers 2010-2023; the v2 build was never extended
 # further back (branch data-2010-current). For earlier years use Stefan's v1
 # snapshot (1986-2013) directly instead of loading 1.4 GB just to get 0 rows.
@@ -61,8 +65,8 @@ btd_soy <- filter(btd, item_code %in% soy_items)
 # full country & item coverage including Soyabean Cake post-2013. Schema differs from
 # the legacy v1 cbs_full: rename supply -> total_supply, add unspecified = 0
 # (the new schema folds it into balancing/residuals).
-.cbs_new_path <- "data/fabio/trade/new/cbs_full.rds"
-.cbs_old_path <- "data/fabio/trade/FABIO_exp/v1/cbs_full.rds"
+.cbs_new_path <- file.path(DATA_DIR, "fabio/trade/new/cbs_full.rds")
+.cbs_old_path <- file.path(DATA_DIR, "fabio/trade/FABIO_exp/v1/cbs_full.rds")
 # PRE-2010: the new cbs_full has rows for 1961-2009 but they are DEGENERATE
 # placeholders (soybeans: production == feed, imports/exports/processing/food all 0
 # through 2009, real balances only from 2010). Using them dumps all trade into
@@ -86,15 +90,15 @@ if (nrow(btd) == 0 || nrow(cbs) == 0) {
     YEAR))
 }
 
-items <- read.csv("data/fabio/trade/FABIO_exp/items.csv")
-regions <- readRDS(paste0("data/generated/outputs/04_", YEAR, "/regions.rds"))
+items <- read.csv(file.path(DATA_DIR, "fabio/trade/FABIO_exp/items.csv"))
+regions <- readRDS(paste0(DATA_DIR, "/generated/outputs/04_", YEAR, "/regions.rds"))
 regions_btd <- distinct(regions, CO_BTD, ISO_BTD) %>% arrange(CO_BTD)
 areas <- sort(unique(cbs$area_code))
 
 # sub-national soy trade: imports, exports and intra-municipal trade flows
-exp <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/EXP_MUN_SOY_cbs.rds"))
-imp <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/IMP_MUN_SOY_cbs.rds"))
-intra <- readRDS(paste0("data/generated/outputs/08_", YEAR, "/flows_mu.rds"))
+exp <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/EXP_MUN_SOY_cbs.rds"))
+imp <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/IMP_MUN_SOY_cbs.rds"))
+intra <- readRDS(paste0(DATA_DIR, "/generated/outputs/08_", YEAR, "/flows_mu.rds"))
 
 
 # prepare reallocation of re-exports --------------------------------------
@@ -143,6 +147,33 @@ regions_code_soy <- regions_soy$CO_BTD
 mapping_templ_soy <- data.table(expand.grid(
   from_code = regions_code_soy, to_code = regions_code_soy, stringsAsFactors = FALSE))
 setkey(mapping_templ_soy, from_code, to_code)
+
+# Guard: every soy flow must have BOTH endpoints inside the matrix dimensions.
+# The left_join below keeps only flows whose from/to codes are in `dims`, so a flow
+# keyed to a municipality missing from SOY_MUN is dropped SILENTLY -- while the CBS
+# harmonization above has already counted its tonnes in imp_btd/exp_btd. The two then
+# disagree, the region's identity dom_share = 1 - imports/total_use breaks, the error
+# propagates through (I-R)^-1, and the run dies ~200 lines later in the re-export
+# margin check with an unreadable "Mean relative difference".
+# That is exactly how YEAR=2000 failed: GEO_MUN_2000_IBGE was missing 76 of 77 Espirito
+# Santo municipalities, so a 17,345 t soy-cake export from VIANA (3205101) to the
+# Netherlands had nowhere to go (colSums 1.56e-4 vs the 1e-4 tolerance, item 2590).
+# Fail here instead, naming the offending codes and tonnage.
+.orphan <- as.data.table(btd_ext)[item_code %in% soy_items &
+                                  (!from_code %in% regions_code_soy | !to_code %in% regions_code_soy)]
+if (nrow(.orphan)) {
+  .by <- .orphan[, .(rows = .N, tonnes = sum(value, na.rm = TRUE)),
+                 by = .(item_code,
+                        bad_from = ifelse(from_code %in% regions_code_soy, NA_real_, from_code),
+                        bad_to   = ifelse(to_code   %in% regions_code_soy, NA_real_, to_code))][order(-tonnes)]
+  print(utils::head(.by, 20))
+  stop(sprintf(paste0("[12] %d soy trade flow(s) (%.2f t) reference codes outside the re-export ",
+                      "matrix dimensions (YEAR=%d). Offending codes printed above. A municipality ",
+                      "code here means it is absent from SOY_MUN -- check the step-00 municipality ",
+                      "master list (raw/00/IBGE_municipalities/GEO_MUN_<Y>_IBGE.xlsx) for that year."),
+               nrow(.orphan), sum(.orphan$value, na.rm = TRUE), YEAR), call. = FALSE)
+}
+rm(.orphan)
 
 mapping_reex <- lapply(items$item_code, function(x){
   btd_item <- filter(btd_ext, item_code == x) %>% dplyr::select(!item_code)
