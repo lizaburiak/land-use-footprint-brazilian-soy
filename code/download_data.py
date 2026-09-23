@@ -29,6 +29,10 @@ import io
 import ssl
 from pathlib import Path
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -36,7 +40,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 # Write straight into the pipeline's input tree (data/raw/), organized by source
 # subfolder, so downloaded files are read by the pipeline with no manual moving.
-RAW_DIR = BASE_DIR.parent / "data" / "raw"
+RAW_DIR = DATA_DIR / "raw"
 YEARS = list(range(2014, 2026))  # 2014 through 2025
 
 # Retry settings
@@ -809,17 +813,17 @@ def download_municipality_boundaries(years, dry_run=False):
     helper_script.parent.mkdir(parents=True, exist_ok=True)
     with open(helper_script, "w") as f:
         f.write('# Helper script to download municipality boundaries using geobr\n')
-        f.write('# Run this in R: source("data/raw/00/_scripts/download_geobr_boundaries.R")\n\n')
+        f.write(f'# Run this in R: source("{DATA_DIR}/raw/00/_scripts/download_geobr_boundaries.R")\n\n')
         f.write('if (!require("geobr")) install.packages("geobr")\n')
         f.write('if (!require("sf")) install.packages("sf")\n\n')
         f.write('library(geobr)\nlibrary(sf)\n\n')
         f.write(f'years <- {min(years)}:{max(years)}\n\n')
-        f.write('dir.create("data/raw/00/IBGE_boundaries", recursive = TRUE, showWarnings = FALSE)\n\n')
+        f.write(f'dir.create("{DATA_DIR}/raw/00/IBGE_boundaries", recursive = TRUE, showWarnings = FALSE)\n\n')
         f.write('for (yr in years) {\n')
         f.write('  cat(sprintf("Downloading municipality boundaries for %d...\\n", yr))\n')
         f.write('  tryCatch({\n')
         f.write('    mun <- read_municipality(year = yr, showProgress = FALSE)\n')
-        f.write('    out_file <- sprintf("data/raw/00/IBGE_boundaries/municipios_%d.gpkg", yr)\n')
+        f.write(f'    out_file <- sprintf("{DATA_DIR}/raw/00/IBGE_boundaries/municipios_%d.gpkg", yr)\n')
         f.write('    st_write(mun, out_file, driver = "GPKG", delete_dsn = TRUE)\n')
         f.write('    cat(sprintf("  Saved: %s\\n", out_file))\n')
         f.write('  }, error = function(e) {\n')
@@ -960,51 +964,51 @@ def main():
     log("1. ABIOVE Processing Facilities")
     log("   URL: https://abiove.org.br/estatisticas/")
     log("   Look for: 'Capacidade Instalada' spreadsheets")
-    log("   Save as: data/raw/00/ABIOVE_processing/ABIOVE_raw_capacity_{YEAR}.xlsx")
+    log(f"   Save as: {DATA_DIR}/raw/00/ABIOVE_processing/ABIOVE_raw_capacity_{{YEAR}}.xlsx")
     log("   Sheets needed: 'processing_MUN' and 'refining_bottling_MUN'")
     log("   Columns: co_mun, nm_mun, nm_state, proc_fac_act, proc_cap_act, ...")
     log("")
     log("2. ANP Biodiesel Capacity")
     log("   URL: https://www.gov.br/anp/pt-br/centrais-de-conteudo/publicacoes/anuario-estatistico/")
     log("   Look for: Table 2.6 in each annual yearbook")
-    log("   Save as: data/raw/00/ANP_biodiesel/Biodiesel_capacity_{YEAR}_ANP.xlsx")
+    log(f"   Save as: {DATA_DIR}/raw/00/ANP_biodiesel/Biodiesel_capacity_{{YEAR}}_ANP.xlsx")
     log("   Sheets needed: 'capacity' (facility + m3/day) and 'materials' (soy share by region)")
     log("")
     log("3. IBGE POF (Soy Oil Consumption)")
     log("   URL: https://www.ibge.gov.br/estatisticas/sociais/educacao/9050-pesquisa-de-orcamentos-familiares.html")
     log("   Only POF 2017-2018 available. POF 2024-2025 expected in 2026.")
-    log("   Save as: data/raw/00/IBGE_POF/POF_soy_oil_{YEAR}_IBGE.csv (reuse for all years, or interpolate)")
+    log(f"   Save as: {DATA_DIR}/raw/00/IBGE_POF/POF_soy_oil_{{YEAR}}_IBGE.csv (reuse for all years, or interpolate)")
     log("")
     log("4. IBGE Grain Storage Facilities (point locations)")
     log("   URL: https://www.ibge.gov.br/estatisticas/economicas/agricultura-e-pecuaria/9199-pesquisa-de-estoques.html")
     log("   Aggregated data: https://sidra.ibge.gov.br/tabela/278")
-    log("   Save as: data/raw/00/IBGE_storage/armazens_{YEAR}.shp")
+    log(f"   Save as: {DATA_DIR}/raw/00/IBGE_storage/armazens_{{YEAR}}.shp")
     log("   Note: point-level facility data may require contacting IBGE directly")
     log("")
     log("5. FAO Gridded Livestock (GLW3) - STATIC, reuse from original")
     log("   URL: https://dataverse.harvard.edu/dataverse/glw")
-    log("   These are 2010 reference year rasters. Reuse the existing files in data/raw/02/geo/FAO_gridded_livestock/")
+    log(f"   These are 2010 reference year rasters. Reuse the existing files in {DATA_DIR}/raw/02/geo/FAO_gridded_livestock/")
     log("")
     log("6. FAO GLEAM Production System Raster - STATIC, reuse from original")
     log("   URL: https://www.fao.org/gleam/resources/en/")
-    log("   Reuse existing: data/raw/02/geo/FAO_gridded_livestock/glps_gleam_61113_10km.tif")
+    log(f"   Reuse existing: {DATA_DIR}/raw/02/geo/FAO_gridded_livestock/glps_gleam_61113_10km.tif")
     log("")
     log("7. FAO GLEAM Feed Ratios - STATIC, reuse from original")
-    log("   Reuse existing: data/raw/03/Feed_ratios_FAO.xlsx")
+    log(f"   Reuse existing: {DATA_DIR}/raw/03/Feed_ratios_FAO.xlsx")
     log("")
     log("8. IBGE Census Feedlot Cattle")
     log("   2006 Census: https://sidra.ibge.gov.br/tabela/919 (already have)")
     log("   2017 Census: https://sidra.ibge.gov.br/tabela/6911 (download manually)")
-    log("   Save as: data/raw/02/FeedlotCattle_2017_tabela6911_IBGE.xlsx")
+    log(f"   Save as: {DATA_DIR}/raw/02/FeedlotCattle_2017_tabela6911_IBGE.xlsx")
     log("")
     log("9. FABIO Bilateral Trade Data")
     log("   Pre-built (1986-2013): https://doi.org/10.5281/zenodo.2577066")
     log("   To extend: clone https://github.com/fineprint-global/fabio and rebuild with updated FAOSTAT data")
-    log("   Save outputs to: data/fabio/trade/")
+    log(f"   Save outputs to: {DATA_DIR}/fabio/trade/")
     log("")
     log("10. IBGE Localities (municipality capitals)")
     log("    URL: https://geoftp.ibge.gov.br/organizacao_do_territorio/estrutura_territorial/localidades/")
-    log("    2022 edition available. Save to: data/raw/00/IBGE_localities/")
+    log(f"    2022 edition available. Save to: {DATA_DIR}/raw/00/IBGE_localities/")
     log("    Note: static reference data, can reuse 2010 version for all years")
     log("")
     log("=" * 60)

@@ -34,6 +34,10 @@
 #   data/generated/outputs/00_comparison/compare_national_total.csv   (national × method × year)
 ###############################################################################
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressPackageStartupMessages({
   library(dplyr)
   library(tidyr)
@@ -52,10 +56,10 @@ if (!file.exists(file.path(ROOT, "inputs"))) {
 setwd(ROOT)
 cat("Working dir:", getwd(), "\n\n")
 
-OUT_DIR <- "data/generated/outputs/00_comparison"
+OUT_DIR <- file.path(DATA_DIR, "generated/outputs/00_comparison")
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 
-ABIOVE_2025_FILE <- "data/raw/00/ABIOVE_processing/ABIOVE_raw_capacity_2025.xlsx"
+ABIOVE_2025_FILE <- file.path(DATA_DIR, "raw/00/ABIOVE_processing/ABIOVE_raw_capacity_2025.xlsx")
 STEFAN_FILE      <- "archive/data_stefan_2013/Processing_facilities_2013_ABIOVE.xlsx"
 
 

@@ -3,6 +3,10 @@
 
 ## this version averages subnational flows across the simulations of the multimodal model and then conducts the linkage
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -23,11 +27,11 @@ source("code/pipeline/00_checks.R")
 
 write = TRUE
 
-out_dir <- paste0("data/generated/outputs/08_", YEAR)
+out_dir <- paste0(DATA_DIR, "/generated/outputs/08_", YEAR)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-bs_res_dir <- paste0("./data/generated/outputs/gams/bs_res_", YEAR)
+bs_res_dir <- paste0(DATA_DIR, "/generated/outputs/gams/bs_res_", YEAR)
 
-flows_euclid <- readRDS(paste0("data/generated/outputs/07_", YEAR, "/flows_euclid.rds"))
+flows_euclid <- readRDS(paste0(DATA_DIR, "/generated/outputs/07_", YEAR, "/flows_euclid.rds"))
 bs_files <- if (dir.exists(bs_res_dir)) list.files(bs_res_dir, pattern="*.rds", full.names=F) else character(0)
 # SENSITIVITY: force Euclidean-only (ignore any pre-computed GAMS bootstrap flows
 # on disk). The input-sensitivity screen (code/analysis/sens_inputs.sh) perturbs
@@ -48,9 +52,9 @@ if (has_bootstrap) {
   flows <- flows_euclid
 }
 
-SOY_MUN <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
-EXP_MUN_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/EXP_MUN_SOY_cbs.rds"))
-IMP_MUN_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/IMP_MUN_SOY_cbs.rds"))
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
+EXP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/EXP_MUN_SOY_cbs.rds"))
+IMP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/IMP_MUN_SOY_cbs.rds"))
 
 co_mun <- SOY_MUN$co_mun
 product <- c("bean", "oil", "cake")
@@ -204,11 +208,8 @@ system.time(
         source_to_export, exp_wide, names(source_to_export))
 
     dom_share <- sapply(product, function(x){
-      # Own-production (domestic-origin) share. Written as (total_supply - imports) instead
-      # of production/total_supply: bit-identical when total_supply = prod + imp (use_prop,
-      # and all addition products), and correctly counts withdrawal-supplied tonnes as
-      # domestically originating in supply_side mode, where total_supply also includes
-      # |stock| (STOCK_MODE, step 05). See code/pipeline/CHANGELOG.md.
+      # Own-production (domestic-origin) share, written as (total_supply - imports).
+      # Equals production/total_supply (Stefan) since step 05 keeps stock on the use side.
       dom_share <- ((pull(SOY_MUN, paste0("total_supply_",x)) - pull(SOY_MUN, paste0("imp_",x))) /
                       pull(SOY_MUN, paste0("total_supply_",x)))
       dom_share[is.na(dom_share)] <- 0

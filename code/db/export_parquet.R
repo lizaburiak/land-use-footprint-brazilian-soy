@@ -26,6 +26,10 @@
 #   Rscript code/db/export_parquet.R --all --force   # overwrite existing
 # ============================================================================
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressMessages({
   library(data.table)
   library(Matrix)
@@ -36,11 +40,11 @@ args  <- commandArgs(trailingOnly = TRUE)
 FORCE <- "--force" %in% args
 args  <- setdiff(args, "--force")
 
-OUT_ROOT <- "data/db/parquet"
+OUT_ROOT <- file.path(DATA_DIR, "db/parquet")
 dir.create(OUT_ROOT, showWarnings = FALSE, recursive = TRUE)
 
 years_on_disk <- sort(as.integer(sub("^05_", "", grep("^05_[0-9]{4}$",
-  list.files("data/generated/outputs"), value = TRUE))))
+  list.files(file.path(DATA_DIR, "generated/outputs")), value = TRUE))))
 YEARS <- if ("--all" %in% args) years_on_disk else as.integer(args)
 if (length(YEARS) == 0 || anyNA(YEARS))
   stop("usage: Rscript code/db/export_parquet.R <YEAR ...>|--all [--force]")
@@ -80,7 +84,7 @@ export_year <- function(Y) {
   cat(sprintf("== %d ==\n", Y))
 
   # ---- step 05: production, domestic use, trade ---------------------------
-  f05 <- sprintf("data/generated/outputs/05_%d/SOY_MUN_fin.rds", Y)
+  f05 <- sprintf(file.path(DATA_DIR, "generated/outputs/05_%d/SOY_MUN_fin.rds"), Y)
   if (file.exists(f05)) {
     s <- as.data.table(readRDS(f05))
 
@@ -110,8 +114,8 @@ export_year <- function(Y) {
              "domestic_use", Y, f05)
   } else cat("  [miss]", f05, "\n")
 
-  fe <- sprintf("data/generated/outputs/05_%d/EXP_MUN_SOY_cbs.rds", Y)
-  fi <- sprintf("data/generated/outputs/05_%d/IMP_MUN_SOY_cbs.rds", Y)
+  fe <- sprintf(file.path(DATA_DIR, "generated/outputs/05_%d/EXP_MUN_SOY_cbs.rds"), Y)
+  fi <- sprintf(file.path(DATA_DIR, "generated/outputs/05_%d/IMP_MUN_SOY_cbs.rds"), Y)
   if (file.exists(fe) && file.exists(fi)) {
     e <- as.data.table(readRDS(fe))
     i <- as.data.table(readRDS(fi))
@@ -128,7 +132,7 @@ export_year <- function(Y) {
   } else cat("  [miss]", fe, "\n")
 
   # ---- step 08: export attribution + transport flows ----------------------
-  f08 <- sprintf("data/generated/outputs/08_%d/source_to_export_mean.rds", Y)
+  f08 <- sprintf(file.path(DATA_DIR, "generated/outputs/08_%d/source_to_export_mean.rds"), Y)
   if (file.exists(f08)) {
     se <- readRDS(f08)
     ea <- rbindlist(lapply(names(se), function(m)
@@ -138,7 +142,7 @@ export_year <- function(Y) {
     write_pq(ea[tonnes > 0], "export_attribution", Y, f08)
   } else cat("  [miss]", f08, "\n")
 
-  ffl <- sprintf("data/generated/outputs/08_%d/flows_mu.rds", Y)
+  ffl <- sprintf(file.path(DATA_DIR, "generated/outputs/08_%d/flows_mu.rds"), Y)
   if (file.exists(ffl)) {
     fm <- as.data.table(readRDS(ffl))
     methods <- setdiff(names(fm), c("co_orig", "co_dest", "product"))
@@ -153,7 +157,7 @@ export_year <- function(Y) {
   } else cat("  [miss]", ffl, "\n")
 
   # ---- step 20: land footprints (F_mass, hectares) -------------------------
-  ffp <- sprintf("data/generated/footprints/%d_F_mass.rds", Y)
+  ffp <- sprintf(file.path(DATA_DIR, "generated/footprints/%d_F_mass.rds"), Y)
   if (file.exists(ffp)) {
     FM <- readRDS(ffp)
 
@@ -196,9 +200,9 @@ export_dim_municipality <- function() {
   if (file.exists(path) && !FORCE) { cat("  [skip] dim_municipality\n"); return(invisible()) }
   suppressMessages(library(sf)); sf_use_s2(FALSE)
   yr_geo <- max(YEARS[file.exists(sprintf(
-    "data/generated/outputs/05_%d/GEO_MUN_SOY_fin.rds", YEARS))])
+    file.path(DATA_DIR, "generated/outputs/05_%d/GEO_MUN_SOY_fin.rds"), YEARS))])
   cat(sprintf("  [dim] municipalities from GEO_MUN_SOY_fin %d\n", yr_geo))
-  g <- readRDS(sprintf("data/generated/outputs/05_%d/GEO_MUN_SOY_fin.rds", yr_geo))
+  g <- readRDS(sprintf(file.path(DATA_DIR, "generated/outputs/05_%d/GEO_MUN_SOY_fin.rds"), yr_geo))
   pts <- suppressWarnings(st_coordinates(st_transform(
     st_point_on_surface(st_geometry(g)), 4326)))
   d <- data.table(co_mun = as.integer(g$co_mun), nm_mun = g$nm_mun,
@@ -207,13 +211,13 @@ export_dim_municipality <- function() {
   # municipalities present in other years but not in the reference geometry;
   # backfill coordinates from the newest GEO file that contains them
   for (Y in rev(setdiff(YEARS, yr_geo))) {
-    f <- sprintf("data/generated/outputs/05_%d/SOY_MUN_fin.rds", Y)
+    f <- sprintf(file.path(DATA_DIR, "generated/outputs/05_%d/SOY_MUN_fin.rds"), Y)
     if (!file.exists(f)) next
     s <- as.data.table(readRDS(f))[, .(co_mun = as.integer(co_mun), nm_mun,
                                        co_state = as.integer(co_state), nm_state)]
     extra <- s[!co_mun %in% d$co_mun]
     if (nrow(extra) == 0) next
-    fg <- sprintf("data/generated/outputs/05_%d/GEO_MUN_SOY_fin.rds", Y)
+    fg <- sprintf(file.path(DATA_DIR, "generated/outputs/05_%d/GEO_MUN_SOY_fin.rds"), Y)
     extra[, `:=`(lon = NA_real_, lat = NA_real_)]
     if (file.exists(fg)) {
       g2 <- readRDS(fg)
@@ -238,7 +242,7 @@ export_dim_municipality <- function() {
   # municipalities absent from the cached lookup (created after its base year):
   # locate them in the IBGE biome polygons directly
   miss <- which(is.na(d$biome) & !is.na(d$lon))
-  bshp <- "data/geo/IBGE_biomes/lm_bioma_250.shp"
+  bshp <- file.path(DATA_DIR, "geo/IBGE_biomes/lm_bioma_250.shp")
   if (length(miss) && file.exists(bshp)) {
     bio <- suppressMessages(st_read(bshp, quiet = TRUE))
     pts <- st_transform(st_as_sf(d[miss], coords = c("lon", "lat"), crs = 4326),

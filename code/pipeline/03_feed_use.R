@@ -1,6 +1,10 @@
 
 ####### Feed use estimation, using estimated animal numbers by livestock system and FAO feed ratios ############
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 library(dplyr)
 library(sf)
 library(openxlsx)
@@ -9,9 +13,9 @@ source("code/pipeline/00_checks.R")
 # Year parameter (default 2013)
 args <- commandArgs(trailingOnly = TRUE)
 YEAR <- if (length(args) > 0) as.integer(args[1]) else 2013
-IN00 <- paste0("data/generated/outputs/00_", YEAR, "/")
-IN02 <- paste0("data/generated/outputs/02_", YEAR, "/")
-OUT  <- paste0("data/generated/outputs/03_", YEAR, "/")
+IN00 <- paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/")
+IN02 <- paste0(DATA_DIR, "/generated/outputs/02_", YEAR, "/")
+OUT  <- paste0(DATA_DIR, "/generated/outputs/03_", YEAR, "/")
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 # should results be written to file ?
@@ -20,7 +24,7 @@ write = TRUE
 # load data ---------
 SOY_MUN <- readRDS(paste0(IN02, "SOY_MUN_02.rds"))
 GEO_MUN_SOY <- readRDS(paste0(IN02, "GEO_MUN_SOY_02.rds"))
-feed_ratios <- openxlsx::read.xlsx("data/raw/03/Feed_ratios_FAO.xlsx", sheet = 2)
+feed_ratios <- openxlsx::read.xlsx(file.path(DATA_DIR, "raw/03/Feed_ratios_FAO.xlsx"), sheet = 2)
 CBS_SOY <- readRDS(paste0(IN00, "CBS_SOY.rds"))
 
 

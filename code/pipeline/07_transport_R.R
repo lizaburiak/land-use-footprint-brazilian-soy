@@ -1,5 +1,9 @@
 ####### simple transport optimization within R, using the transport package #######
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -12,14 +16,14 @@ library(abind)
 
 write = TRUE
 
-out_dir <- paste0("data/generated/outputs/07_", YEAR)
+out_dir <- paste0(DATA_DIR, "/generated/outputs/07_", YEAR)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # load data
 # Note: MUN_capital_dist.rds is produced by step 00 (code/pipeline/00_data_preperation.R),
 # not by step 06. Reading from data/generated/outputs/00_{YEAR}/ instead of data/generated/outputs/05_{YEAR}/.
-SOY_MUN <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
-MUN_capital_dist <- readRDS(paste0("data/generated/outputs/00_", YEAR, "/MUN_capital_dist.rds"))
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
+MUN_capital_dist <- readRDS(paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/MUN_capital_dist.rds"))
 # Subset distance matrix to municipalities present in SOY_MUN (step 00 may include a
 # few extras that get filtered out by step 05; transport package requires dim match).
 .mun <- as.character(SOY_MUN$co_mun)

@@ -1,10 +1,14 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
     length(list.files("archive/fabio_stefan/inst")) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
@@ -32,32 +36,32 @@ for(year in years){
   print(year)
   
   if(year<1995){
-    load(paste0("data/exiobase/pxp/1995_L.RData"))
-    load(paste0("data/exiobase/pxp/1995_x.RData"))
+    load(paste0(DATA_DIR, "/exiobase/pxp/1995_L.RData"))
+    load(paste0(DATA_DIR, "/exiobase/pxp/1995_x.RData"))
   } else {
-    load(paste0("data/exiobase/pxp/", year, "_x.RData"))
-    load(paste0("data/exiobase/pxp/", year, "_L.RData"))
+    load(paste0(DATA_DIR, "/exiobase/pxp/", year, "_x.RData"))
+    load(paste0(DATA_DIR, "/exiobase/pxp/", year, "_L.RData"))
   }
   
   D_inv <- as(L, "sparseMatrix") # L
   rm(L); gc()
   
-  B <- readRDS(paste0("data/generated/fabio/B.rds"))[[paste(year)]]
+  B <- readRDS(paste0(DATA_DIR, "/generated/fabio/B.rds"))[[paste(year)]]
   #B <- t(t(B)/x)
   #B[!is.finite(B)] <- 0
   B@x <- B@x / rep.int(x, diff(B@p))
   B[B<0] <- 0
   B <- 0-B
   
-  A_inv <- readRDS(paste0("data/generated/fabio/", year, "_L_mass.rds"))
+  A_inv <- readRDS(paste0(DATA_DIR, "/generated/fabio/", year, "_L_mass.rds"))
   B_inv <- -A_inv %*% B %*% D_inv  
   # B_inv <- as(B_inv, "dgCMatrix") # if D_inv is not already spares (might be faster)?
-  saveRDS(B_inv, paste0("data/generated/fabio/", year, "_B_inv_mass.rds"))
+  saveRDS(B_inv, paste0(DATA_DIR, "/generated/fabio/", year, "_B_inv_mass.rds"))
   
-  A_inv <- readRDS(paste0("data/generated/fabio/",  year, "_L_value.rds"))
+  A_inv <- readRDS(paste0(DATA_DIR, "/generated/fabio/",  year, "_L_value.rds"))
   B_inv <- -A_inv %*% B %*% D_inv
   # B_inv <- as(B_inv, "dgCMatrix")
-  if (write) saveRDS(B_inv, paste0("data/generated/fabio/", year, "_B_inv_value.rds"))
+  if (write) saveRDS(B_inv, paste0(DATA_DIR, "/generated/fabio/", year, "_B_inv_value.rds"))
   
 }
 

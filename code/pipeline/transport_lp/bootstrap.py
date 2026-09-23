@@ -11,6 +11,7 @@ and 08_export_link_sep.R consume it unchanged.
     python code/pipeline/transport_lp/bootstrap.py 2013 --n-iters 1000 --workers 8
 """
 from __future__ import annotations
+import os
 import argparse
 import multiprocessing as mp
 import sys
@@ -27,6 +28,10 @@ from transport_lp.data_loader import (
 from transport_lp.cost_perturbation import draw
 from transport_lp.model import build_structure, set_costs, solve_model, extract_flows
 from transport_lp.write_output import consolidate_flows, write_iteration_rds, append_bs_par
+
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
 
 
 # Module-level workers (so they're picklable across processes).
@@ -79,7 +84,7 @@ def main():
     args = p.parse_args()
 
     step06_year = args.cost_fallback_year or args.year
-    bs_res_dir = Path(f"data/generated/outputs/gams/bs_res_{args.year}")
+    bs_res_dir = DATA_DIR / f"generated/outputs/gams/bs_res_{args.year}"
     bs_par_csv = bs_res_dir / "bs_par.csv"
     bs_res_dir.mkdir(parents=True, exist_ok=True)
 

@@ -13,6 +13,10 @@
 #      the national ABIEC confinement series (see the feedlot block below) - no
 #      longer frozen at the 2013 growth factor.
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 library(raster)
 library(sf)
 library(exactextractr)
@@ -26,8 +30,8 @@ source("code/pipeline/00_checks.R")
 # Year parameter (default 2013)
 args <- commandArgs(trailingOnly = TRUE)
 YEAR <- if (length(args) > 0) as.integer(args[1]) else 2013
-IN01 <- paste0("data/generated/outputs/01_", YEAR, "/")
-OUT  <- paste0("data/generated/outputs/02_", YEAR, "/")
+IN01 <- paste0(DATA_DIR, "/generated/outputs/01_", YEAR, "/")
+OUT  <- paste0(DATA_DIR, "/generated/outputs/02_", YEAR, "/")
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 # should results be written to file?
@@ -60,24 +64,24 @@ GEO_MUN_SOY <- .floor_chicken(GEO_MUN_SOY)
 SOY_MUN     <- .floor_chicken(SOY_MUN)
 
 # chicken rasters
-ChExt <- raster("data/raw/02/geo/FAO_gridded_livestock/06_ChExt_2010_Da.tif")
-ChInt <- raster("data/raw/02/geo/FAO_gridded_livestock/07_ChInt_2010_Da.tif")
+ChExt <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/06_ChExt_2010_Da.tif"))
+ChInt <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/07_ChInt_2010_Da.tif"))
 
 # pig rasters
-PgExt <- raster("data/raw/02/geo/FAO_gridded_livestock/8_PgExt_2010_Da.tif")
-PgInt <- raster("data/raw/02/geo/FAO_gridded_livestock/9_PgInt_2010_Da.tif")
-PgInd <- raster("data/raw/02/geo/FAO_gridded_livestock/10_PgInd_2010_Da.tif")
+PgExt <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/8_PgExt_2010_Da.tif"))
+PgInt <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/9_PgInt_2010_Da.tif"))
+PgInd <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/10_PgInd_2010_Da.tif"))
 
 
 # cattle distribution raster (only numbers, no systems)
-Cattle <- raster("data/raw/02/geo/FAO_gridded_livestock/5_Ct_2010_Da.tif")
+Cattle <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/5_Ct_2010_Da.tif"))
 # buffalo distribution raster (only numbers, no systems)
-Buffalo <- raster("data/raw/02/geo/FAO_gridded_livestock/5_Bf_2010_Da.tif")
+Buffalo <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/5_Bf_2010_Da.tif"))
 # ruminant systems
-RumSys <- raster("data/raw/02/geo/FAO_gridded_livestock/glps_gleam_61113_10km.tif")
+RumSys <- raster(file.path(DATA_DIR, "raw/02/geo/FAO_gridded_livestock/glps_gleam_61113_10km.tif"))
 
 # feedlot cattle data (IBGE 2006 census)
-feedlot <- openxlsx::read.xlsx("data/raw/02/FeedlotCattle_2006_tabela919_IBGE.xlsx", rows = 6:5455, na.strings = c("X", "-"))
+feedlot <- openxlsx::read.xlsx(file.path(DATA_DIR, "raw/02/FeedlotCattle_2006_tabela919_IBGE.xlsx"), rows = 6:5455, na.strings = c("X", "-"))
 
 # crop data to extent of Brazil
 GEO_MUN_SOY_WGS84 <- st_transform(GEO_MUN_SOY, crs = st_crs(ChExt))

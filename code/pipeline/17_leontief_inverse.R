@@ -1,10 +1,14 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
     length(list.files("archive/fabio_stefan/inst")) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
@@ -81,10 +85,10 @@ prep_solve <- function(year, Z, Y, X,
 years <- YEAR
 years_singular <- c(1986,1994,2002,2009)
 
-Z_m <- readRDS("data/generated/fabio/Z_mass.rds")
-Z_v <- readRDS("data/generated/fabio/Z_value.rds")
-Y <- readRDS("data/generated/fabio/Y.rds")
-X <- readRDS("data/generated/fabio/X.rds")
+Z_m <- readRDS(file.path(DATA_DIR, "generated/fabio/Z_mass.rds"))
+Z_v <- readRDS(file.path(DATA_DIR, "generated/fabio/Z_value.rds"))
+Y <- readRDS(file.path(DATA_DIR, "generated/fabio/Y.rds"))
+X <- readRDS(file.path(DATA_DIR, "generated/fabio/X.rds"))
 
 
 for(year in years){
@@ -96,12 +100,12 @@ for(year in years){
   L <- prep_solve(year = year, Z = Z_m[[as.character(year)]],
                   Y = Y[[as.character(year)]], X = X[, as.character(year)],
                   adj_diag = adjust)
-  if (write) saveRDS(L, paste0("data/generated/fabio/", year, "_L_mass.rds"))
+  if (write) saveRDS(L, paste0(DATA_DIR, "/generated/fabio/", year, "_L_mass.rds"))
   
   L <- prep_solve(year = year, Z = Z_v[[as.character(year)]],
                   Y = Y[[as.character(year)]], X = X[, as.character(year)],
                   adj_diag = adjust)
-  if (write) saveRDS(L, paste0("data/generated/fabio/", year, "_L_value.rds"))
+  if (write) saveRDS(L, paste0(DATA_DIR, "/generated/fabio/", year, "_L_value.rds"))
   
 }
 

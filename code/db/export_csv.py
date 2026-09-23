@@ -19,14 +19,19 @@ Usage:
     .venv/bin/python code/db/export_csv.py --skip-big # skip the per-year dumps
 """
 
+import os
 import sys
 from pathlib import Path
 
 import duckdb
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
 ROOT = Path(__file__).resolve().parents[2]
-DB = ROOT / "data/db/soyprint.duckdb"
-OUT = ROOT / "data/db/csv"
+DB = DATA_DIR / "db/soyprint.duckdb"
+OUT = DATA_DIR / "db/csv"
 
 # municipality-level footprint triplets: 9-47M rows -> per-year gzip
 BIG = ["footprint_country", "footprint_product", "footprint_animal_country"]

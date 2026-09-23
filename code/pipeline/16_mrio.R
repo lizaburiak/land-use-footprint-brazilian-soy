@@ -1,11 +1,15 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
-    length(list.files("data/fabio/v2/inst")) == 0) {
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
+    length(list.files(file.path(DATA_DIR, "fabio/v2/inst"))) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
@@ -25,9 +29,9 @@ write = TRUE
 
 # MRIO Table ---
 
-mr_sup_m <- readRDS("data/generated/fabio/mr_sup_mass.rds")
-mr_sup_v <- readRDS("data/generated/fabio/mr_sup_value.rds")
-mr_use <- readRDS("data/generated/fabio/mr_use.rds")
+mr_sup_m <- readRDS(file.path(DATA_DIR, "generated/fabio/mr_sup_mass.rds"))
+mr_sup_v <- readRDS(file.path(DATA_DIR, "generated/fabio/mr_sup_value.rds"))
+mr_use <- readRDS(file.path(DATA_DIR, "generated/fabio/mr_use.rds"))
 
 # check for conformity (halt on mismatch)
 stopifnot(identical(rownames(mr_sup_m[[as.character(YEAR)]]), colnames(mr_use[[as.character(YEAR)]])),
@@ -85,12 +89,12 @@ Z_v <- mapply(function(x, y) {
 # Rebalance row sums in Z and Y -----------------------------------------
 
 library(data.table)
-regions <- fread("data/fabio/v2/inst/regions_full.csv")
+regions <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
 regions <- regions[cbs==TRUE]
-items <- fread("data/fabio/v2/inst/items_full.csv")
+items <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
 nrcom <- nrow(items)
-Y <- readRDS("data/generated/fabio/mr_use_fd.rds")
-Y_orig <- readRDS("data/generated/fabio/mr_use_fd.rds")
+Y <- readRDS(file.path(DATA_DIR, "generated/fabio/mr_use_fd.rds"))
+Y_orig <- readRDS(file.path(DATA_DIR, "generated/fabio/mr_use_fd.rds"))
 
 # compute total use of each commodity by using country in mr_use and Z
 agg_country <- function(mat){
@@ -171,10 +175,10 @@ X <- mapply(function(x, y) {
 
 # Store X, Y, Z variables
 if (write){
-  saveRDS(Z_m, "data/generated/fabio/Z_mass.rds")
-  saveRDS(Z_v, "data/generated/fabio/Z_value.rds")
-  saveRDS(Y, "data/generated/fabio/Y.rds")
-  saveRDS(X, "data/generated/fabio/X.rds")
+  saveRDS(Z_m, file.path(DATA_DIR, "generated/fabio/Z_mass.rds"))
+  saveRDS(Z_v, file.path(DATA_DIR, "generated/fabio/Z_value.rds"))
+  saveRDS(Y, file.path(DATA_DIR, "generated/fabio/Y.rds"))
+  saveRDS(X, file.path(DATA_DIR, "generated/fabio/X.rds"))
 }
 
 

@@ -1,13 +1,17 @@
 
 ####### Script to compare aggregate MU data with national data from FAO
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 library(dplyr)
 library(openxlsx)
 
 # Year parameter (default 2013)
 args <- commandArgs(trailingOnly = TRUE)
 YEAR <- if (length(args) > 0) as.integer(args[1]) else 2013
-OUT  <- paste0("data/generated/outputs/00_", YEAR, "/")
+OUT  <- paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/")
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 # should results be written to file?
@@ -15,7 +19,7 @@ write = TRUE
 
 # load and format data ---------------------------------------------------------------------------------
 SOY_MUN <- readRDS(paste0(OUT, "SOY_MUN_00.rds"))
-CBS_SOY <- openxlsx::read.xlsx(paste0("data/raw/00/FAO_CBS/CBS_SOY_", YEAR, "_FAO.xlsx"))
+CBS_SOY <- openxlsx::read.xlsx(paste0(DATA_DIR, "/raw/00/FAO_CBS/CBS_SOY_", YEAR, "_FAO.xlsx"))
 
 # format FAO CBS
 CBS_SOY <- CBS_SOY[-c(1,2, nrow(CBS_SOY)),]
