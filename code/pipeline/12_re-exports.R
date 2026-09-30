@@ -141,8 +141,18 @@ setkey(mapping_templ, from_code, to_code)
 
 regions_soy <- regions_btd %>%
   filter(ISO_BTD != "BRA") %>%
-  bind_rows(setNames(SOY_MUN[,1:2], names(regions_btd)))
+  bind_rows(setNames(SOY_MUN[,1:2], names(regions_btd))) %>%
+  arrange(CO_BTD)
 regions_code_soy <- regions_soy$CO_BTD
+
+# Guard: the re-export matrices index rows/cols with dense_rank(code), i.e. in SORTED code
+# order, and label them with these vectors; the per-commodity merge() below also returns rows
+# in sorted area_code order. So the vectors must be sorted and unique. In 2000 and 2004,
+# SOY_MUN_fin ends with out-of-order codes (2919553; 5104526, 5104542), and before the
+# arrange() above every municipality after them carried its neighbour's label (13.4 Mt of
+# beans moved in 2004). CO_BTD is numeric, so both orders are numeric.
+stopifnot(!is.unsorted(regions_code), !is.unsorted(regions_code_soy),
+          !anyDuplicated(regions_code), !anyDuplicated(regions_code_soy))
 
 mapping_templ_soy <- data.table(expand.grid(
   from_code = regions_code_soy, to_code = regions_code_soy, stringsAsFactors = FALSE))
@@ -185,6 +195,17 @@ mapping_reex <- lapply(items$item_code, function(x){
     dims <- regions_code}
   map <- left_join(templ, btd_item, by = c("from_code", "to_code")) %>% replace_na(list(value = 0))
   mat <- with(map, sparseMatrix(i=dense_rank(from_code), j = dense_rank(to_code), x=value, dimnames=list(dims, dims)))
+  # Per-label conservation: each labelled row must carry exactly the flows that leave that
+  # code. National totals cannot see a label scramble (tonnes are conserved, only moved),
+  # which is how the 2000/2004 bug passed every other check.
+  out_in <- as.data.table(btd_item)[from_code %in% dims & to_code %in% dims,
+                                    .(v = sum(value, na.rm = TRUE)), by = from_code]
+  out_mat <- rowSums(mat)[as.character(out_in$from_code)]
+  bad <- abs(out_mat - out_in$v) > 1e-6 * pmax(1, abs(out_in$v))
+  if (any(bad)) {
+    stop(sprintf("[12] item %s: %d row label(s) of the re-export matrix do not carry their own outflows (first: %s, %.3f t vs %.3f t).",
+                 x, sum(bad), out_in$from_code[bad][1], out_mat[bad][1], out_in$v[bad][1]), call. = FALSE)
+  }
   return(mat)
   })
 names(mapping_reex) <- items$item_code
