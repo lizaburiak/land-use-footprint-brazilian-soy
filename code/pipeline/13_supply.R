@@ -1,11 +1,15 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
-    length(list.files("data/fabio/v2/inst")) == 0) {
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
+    length(list.files(file.path(DATA_DIR, "fabio/v2/inst"))) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
@@ -24,8 +28,8 @@ library(data.table)
 
 write = TRUE 
 
-regions <- fread("data/fabio/v2/inst/regions_full.csv")
-items <- fread("data/fabio/v2/inst/items_full.csv")
+regions <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+items <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
 
 
 # Supply ------------------------------------------------------------------
@@ -37,8 +41,8 @@ items <- fread("data/fabio/v2/inst/items_full.csv")
 # (comm_codes are NOT -- they are offset between versions).
 # SOYPRINT_FORCE_V11=1 forces the v1.1 path on 2010+ years (vintage cross-checks).
 .use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
-btd <- readRDS(if (.use_v11) "data/fabio/v1.1/btd_full.rds" else
-                 "data/fabio/v2/btd_full.rds")
+btd <- readRDS(if (.use_v11) file.path(DATA_DIR, "fabio/v1.1/btd_full.rds") else
+                 file.path(DATA_DIR, "fabio/v2/btd_full.rds"))
 # v2 PORT: FABIO v2 labels animal trade as 'An' / '1000 An'; Stefan's v1.1 code
 # expects a 'head' unit (used in the price = usd/head logic below). Normalise:
 # fold '1000 An' into 'An' (x1000), then rename 'An' -> 'head'.
@@ -46,8 +50,8 @@ if (is.data.table(btd) && "unit" %in% names(btd)) {
   btd[unit == "1000 An", `:=`(value = value * 1000, unit = "An")]
   btd[unit == "An", unit := "head"]
 }
-cbs <- readRDS(paste0("data/generated/outputs/12_", YEAR, "/cbs_full.rds"))
-sup <- fread("data/fabio/v2/inst/items_supply.csv")
+cbs <- readRDS(paste0(DATA_DIR, "/generated/outputs/12_", YEAR, "/cbs_full.rds"))
+sup <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_supply.csv"))
 
 
 cat("Allocate production to supplying processes.\n")
@@ -69,8 +73,8 @@ sup <- merge(
 
 # Downscale double-counted production
 cat("Calculate supply shares for livestock products.\n")
-shares <- fread("data/fabio/v2/inst/items_supply-shares.csv")
-live <- readRDS("data/fabio/v2/tidy/live_tidy.rds")
+shares <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_supply-shares.csv"))
+live <- readRDS(file.path(DATA_DIR, "fabio/v2/tidy/live_tidy.rds"))
 
 shares <- merge(shares[source == "live"], live[element == "Production"],
   by.x = c("base_code", "base"), by.y = c("item_code", "item"),
@@ -102,16 +106,19 @@ sup[is.na(share) & comm_code %in% shares$comm_code, production := 0]
 sup[!is.na(share) & comm_code %in% shares$comm_code,
   production := production * share]
 
+## CHANGED: v1.1 item codes ported to FABIO v2 numbering. In v2, c089 = "Oilseed Cakes, Other" and
+# c078/c079/c080 = Ricebran / Maize Germ / Oilcrops Oil, Other; the v1.1 codes c090 and c081 are
+# Wine and Soyabean Cake in v2 (2013: wine supply was zeroed, other oilseed cakes counted 3x).
 cat("Applying oil extraction shares to",
-  sup[comm_code %in% c("c090"), .N],
+  sup[comm_code %in% c("c089"), .N],
   "observations of oilseed cakes.\n")
-shares_o <- sup[comm_code %in% c("c079", "c080", "c081"),
+shares_o <- sup[comm_code %in% c("c078", "c079", "c080"),
   list(proc, share_o = production / sum(production, na.rm = TRUE)),
   by = list(area_code, year)]
 
 sup <- merge(sup, shares_o, by = c("area_code", "year", "proc"), all.x = TRUE)
 sup[is.na(share_o), share_o := 0]
-sup[is.na(share) & comm_code %in% c("c090"),  # c090 = "Oilseed Cakes, Other"
+sup[is.na(share) & comm_code %in% c("c089"),  # c089 = "Oilseed Cakes, Other"
   `:=`(production = production * share_o)]
 sup[, share_o := NULL]
 
@@ -214,7 +221,7 @@ sup[, `:=`(price = ifelse(item == "Palm kernels", price_oil * 0.6, price),
 # original code spread those and averaged. v2 only carries "Milk, Total" and may lack USD
 # rows, so the species spread yields an empty table and crashes. Use a version-agnostic
 # milk price = mean USD value of any "Milk" item per area/year, with empty-table guards.
-mprices <- readRDS("data/fabio/v2/tidy/prices_tidy.rds")
+mprices <- readRDS(file.path(DATA_DIR, "fabio/v2/tidy/prices_tidy.rds"))
 mprices <- mprices[grepl("Milk", item) & months == "Annual value" & unit == "USD",
                    .(area_code, area, year, value)]
 milk_ay <- if (nrow(mprices)) mprices[, .(milk = mean(value, na.rm = TRUE)),
@@ -244,7 +251,7 @@ setkey(sup, year, area_code, comm_code, proc_code)
 # Store results -----------------------------------------------------------
 
 if(write){
-  saveRDS(sup, "data/generated/fabio/sup.rds")
+  saveRDS(sup, file.path(DATA_DIR, "generated/fabio/sup.rds"))
 }
 
 rm(list = ls())

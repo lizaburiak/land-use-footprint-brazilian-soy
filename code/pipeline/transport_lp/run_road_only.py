@@ -16,6 +16,7 @@ Usage:
   python code/pipeline/transport_lp/run_road_only.py 2013 --n-sup 250 --n-dem 250
 """
 from __future__ import annotations
+import os
 import argparse
 import sys
 from pathlib import Path
@@ -29,6 +30,10 @@ from transport_lp.cost_perturbation import central
 from transport_lp.model import build_model, solve_model, extract_flows
 from transport_lp.write_output import consolidate_flows
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
 PRODUCTS = ["bean", "oil", "cake"]
 
 
@@ -40,7 +45,7 @@ def main():
     args = p.parse_args()
     YEAR = args.year
 
-    soy = pd.read_parquet(f"data/generated/outputs/05_{YEAR}/parquet/SOY_MUN_fin.parquet")
+    soy = pd.read_parquet(DATA_DIR / f"generated/outputs/05_{YEAR}/parquet/SOY_MUN_fin.parquet")
     soy["co_mun"] = soy["co_mun"].astype(str)
 
     # pick the biggest real supply & demand municipalities per product
@@ -71,7 +76,7 @@ def main():
                 demand[(m, prod)] = float(v)
 
     # real great-circle road distances -> cost (restricted to kept pairs)
-    dl = pd.read_parquet(f"data/generated/outputs/00_{YEAR}/parquet/MUN_capital_dist_long.parquet")
+    dl = pd.read_parquet(DATA_DIR / f"generated/outputs/00_{YEAR}/parquet/MUN_capital_dist_long.parquet")
     dl["from"] = dl["from"].astype(str)
     dl["to"] = dl["to"].astype(str)
     sub = dl[dl["from"].isin(keep) & dl["to"].isin(keep)]

@@ -9,12 +9,17 @@
 No SQL given -> opens an interactive DuckDB shell on the database.
 Read-only: safe to run while the pipeline is writing elsewhere.
 """
+import os
 import sys
 from pathlib import Path
 
 import duckdb
 
-DB = Path(__file__).resolve().parents[2] / "data/db/soyprint.duckdb"
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
+DB = DATA_DIR / "db/soyprint.duckdb"
 
 
 def main() -> None:

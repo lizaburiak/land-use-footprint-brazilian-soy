@@ -1,11 +1,15 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
-    length(list.files("data/fabio/v2/inst")) == 0) {
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
+    length(list.files(file.path(DATA_DIR, "fabio/v2/inst"))) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
@@ -29,18 +33,19 @@ if (!dir.exists("/mnt/nfs_fineprint") &&
 library(data.table)
 library(Matrix)
 source("code/shared/fabio_tidy_functions.R")
+source("code/shared/apply_shares_sparse.R")
 
 write = TRUE
 
-regions <- fread("data/fabio/v2/inst/regions_full.csv")
-items <- fread("data/fabio/v2/inst/items_full.csv")
+regions <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+items <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
 
-sup <- readRDS("data/generated/fabio/sup_final.rds")
-cbs <- readRDS("data/generated/fabio/cbs_final.rds")
-btd <- readRDS(paste0("data/generated/outputs/12_", YEAR, "/btd_final.rds"))
+sup <- readRDS(file.path(DATA_DIR, "generated/fabio/sup_final.rds"))
+cbs <- readRDS(file.path(DATA_DIR, "generated/fabio/cbs_final.rds"))
+btd <- readRDS(paste0(DATA_DIR, "/generated/outputs/12_", YEAR, "/btd_final.rds"))
 
-use <- readRDS("data/generated/fabio/use_final.rds")
-use_fd <- readRDS("data/generated/fabio/use_fd_final.rds")
+use <- readRDS(file.path(DATA_DIR, "generated/fabio/use_final.rds"))
+use_fd <- readRDS(file.path(DATA_DIR, "generated/fabio/use_fd_final.rds"))
 
 years <- YEAR
 areas <- sort(unique(cbs$area_code)) # sort could be avoided by using setkey before saving cbs_final!
@@ -150,8 +155,8 @@ mr_sup_value <- lapply(years, function(x) {
 names(mr_sup_mass) <- names(mr_sup_value) <- years
 
 if (write){
-  saveRDS(mr_sup_mass, "data/generated/fabio/mr_sup_mass.rds")
-  saveRDS(mr_sup_value, "data/generated/fabio/mr_sup_value.rds")
+  saveRDS(mr_sup_mass, file.path(DATA_DIR, "generated/fabio/mr_sup_mass.rds"))
+  saveRDS(mr_sup_value, file.path(DATA_DIR, "generated/fabio/mr_sup_value.rds"))
 }
 
 rm(sup)
@@ -193,7 +198,7 @@ btd_cast <- lapply(years, function(x, btd_x) {
 names(btd_cast) <- years
 
 rm(btd, template )
-if (write) saveRDS(btd_cast, "data/generated/fabio/btd_cast.rds")
+if (write) saveRDS(btd_cast, file.path(DATA_DIR, "generated/fabio/btd_cast.rds"))
 
 # Get commodities and their positions from total supply for domestic use
 comms <- gsub("(^[0-9]+)_(c[0-9]+)", "\\2", rownames(btd_cast[[1]])) # CHANGED: "-" to "_"
@@ -238,7 +243,7 @@ supply_shares <- lapply(btd_cast, function(x, agg, js) {
   #return(out)
 }, agg = agg, js = js)
 
-if (write) saveRDS(supply_shares, "data/generated/fabio/supply_shares.rds")
+if (write) saveRDS(supply_shares, file.path(DATA_DIR, "generated/fabio/supply_shares.rds"))
 rm(agg)
 gc()
 
@@ -284,23 +289,25 @@ mr_use <- mapply(function(x, y) {
   #mr_x <- x[rep(seq_along(commodities), length(areas)), ]
   ## CHANGED: adapt to new structure 
   # make sure that the origin of commodities in the rows conforms with the supply mr_sup matrix
-  mr_x <- x[match(comms, rownames(x)), ] #match(comms, dimnames(x)[[1]])
-  rownames(mr_x) <- rownames(y)
-  
+  #mr_x <- x[match(comms, rownames(x)), ] #match(comms, dimnames(x)[[1]])
+  #rownames(mr_x) <- rownames(y)
+
   #n_proc <- length(processes)
-  
-  areas_proc <- as.numeric(sub("_.*", "", colnames(mr_x)))
-  y_proc <- y[,match(areas_proc, colnames(y))]
-  
+
+  areas_proc <- as.numeric(sub("_.*", "", colnames(x)))
+  #y_proc <- y[,match(areas_proc, colnames(y))]
+
   ## CHANGED: The for loop is inefficient for >5000 areas!!!
   #for(j in seq_along(areas)) { # Per country j
   #  mr_x[, seq(1 + (j - 1) * n_proc, j * n_proc)] <-
   #    mr_x[, seq(1 + (j - 1) * n_proc, j * n_proc)] * y[, j]
   #}
-  
-  mr_x <- mr_x*y_proc
-  
-  
+
+  #mr_x <- mr_x*y_proc
+  ## CHANGED: mr_x * y_proc needs >18 GB (two replicated 200M+-nnz intermediates);
+  # the helper computes the same matrix from the nonzero cells only
+  mr_x <- apply_shares_sparse(x, y, comms, areas_proc)
+
   return(mr_x)
 }, use_cast, supply_shares)
 
@@ -355,25 +362,29 @@ mr_use_fd <- mapply(function(x, y) {
   
   # CHANGED: adapt to new structure:
   #mr_x <- x[rep(seq_along(commodities), length(areas)), ]
-  mr_x <- x[match(comms, rownames(x)), ] 
-  rownames(mr_x) <- rownames(y)
+  #mr_x <- x[match(comms, rownames(x)), ]
+  #rownames(mr_x) <- rownames(y)
 
   # n_var <- length(unique(use_fd[,variable]))
   # for(j in seq_along(areas)) { # Could do this vectorised
   #   mr_x[, seq(1 + (j - 1) * n_var, j * n_var)] <-
   #     mr_x[, seq(1 + (j - 1) * n_var, j * n_var)] * y[, j]
   # }
-  
-  areas_fd <- as.numeric(sub("_.*", "", colnames(mr_x)))
-  y_fd <- y[,match(areas_fd, colnames(y))]
-  colnames(y_fd) <- colnames(x)
+
+  areas_fd <- as.numeric(sub("_.*", "", colnames(x)))
+  #y_fd <- y[,match(areas_fd, colnames(y))]
+  #colnames(y_fd) <- colnames(x)
   # CHANGED: for stock withdrawals, allocate everything to domestic commodity
-  d <- Diagonal(length(unique(areas_fd)))
-  dimnames(d) <- list(unique(areas_fd), unique(areas_fd))
-  areas_comm <- as.numeric(sub("_.*", "", rownames(y_fd)))
-  y_fd[,grepl("stock_withdrawal", colnames(y_fd))] <- d[match(areas_comm, rownames(d)),]
+  #d <- Diagonal(length(unique(areas_fd)))
+  #dimnames(d) <- list(unique(areas_fd), unique(areas_fd))
+  #areas_comm <- as.numeric(sub("_.*", "", rownames(y_fd)))
+  #y_fd[,grepl("stock_withdrawal", colnames(y_fd))] <- d[match(areas_comm, rownames(d)),]
   # allocate
-  mr_x <- mr_x * y_fd
+  #mr_x <- mr_x * y_fd
+  ## CHANGED: same allocation via the sparse helper (see use section); stock_withdrawal
+  # columns get share 1 for the domestic origin, as in the diagonal rule above
+  mr_x <- apply_shares_sparse(x, y, comms, areas_fd,
+                              own_cols = grep("stock_withdrawal", colnames(x)))
   
   return(mr_x)
 }, use_fd_cast, supply_shares)
@@ -441,8 +452,8 @@ mr_use_fd <- lapply(mr_use_fd, function(x){x %*% sum_mat_fd})
 #mr_use_fd <- lapply(mr_use_fd, round)
 
 if (write) {
-  saveRDS(mr_use, "data/generated/fabio/mr_use.rds")
-  saveRDS(mr_use_fd, "data/generated/fabio/mr_use_fd.rds")
+  saveRDS(mr_use, file.path(DATA_DIR, "generated/fabio/mr_use.rds"))
+  saveRDS(mr_use_fd, file.path(DATA_DIR, "generated/fabio/mr_use_fd.rds"))
 }
 
 rm(list = ls())

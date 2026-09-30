@@ -7,6 +7,7 @@ For bootstrap × N iterations, use bootstrap.py.
     python code/pipeline/transport_lp/solve_one.py 2014 --threads 4 --tee
 """
 from __future__ import annotations
+import os
 import argparse
 import sys
 from pathlib import Path
@@ -17,6 +18,10 @@ from transport_lp.data_loader import build_model_inputs, load_soy_mun, load_step
 from transport_lp.cost_perturbation import central
 from transport_lp.model import build_model, solve_model, extract_flows
 from transport_lp.write_output import consolidate_flows, write_iteration_rds, append_bs_par
+
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
 
 
 def main():
@@ -59,7 +64,7 @@ def main():
     print(f"[solve_one] {len(total):,} non-zero (orig, dest, product) flows")
 
     rds_path = write_iteration_rds(total, args.year, args.out_id)
-    bs_par_csv = Path(f"data/generated/outputs/gams/bs_res_{args.year}/bs_par.csv")
+    bs_par_csv = DATA_DIR / f"generated/outputs/gams/bs_res_{args.year}/bs_par.csv"
     append_bs_par(bs_par_csv, args.out_id, cp, res["objective"])
     print(f"[solve_one] Wrote {rds_path}")
     print(f"[solve_one] Appended bootstrap row to {bs_par_csv}")

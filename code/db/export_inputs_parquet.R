@@ -27,6 +27,10 @@
 #   Rscript code/db/export_inputs_parquet.R --all --force # overwrite existing
 # ============================================================================
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressMessages({
   library(data.table)
   library(nanoparquet)
@@ -36,11 +40,11 @@ args  <- commandArgs(trailingOnly = TRUE)
 FORCE <- "--force" %in% args
 args  <- setdiff(args, "--force")
 
-OUT_ROOT <- "data/db/parquet"
+OUT_ROOT <- file.path(DATA_DIR, "db/parquet")
 dir.create(OUT_ROOT, showWarnings = FALSE, recursive = TRUE)
 
 years_on_disk <- sort(as.integer(sub("^00_", "", grep("^00_[0-9]{4}$",
-  list.files("data/generated/outputs"), value = TRUE))))
+  list.files(file.path(DATA_DIR, "generated/outputs")), value = TRUE))))
 YEARS <- if ("--all" %in% args) years_on_disk else as.integer(args)
 if (length(YEARS) == 0 || anyNA(YEARS))
   stop("usage: Rscript code/db/export_inputs_parquet.R <YEAR ...>|--all [--force]")
@@ -75,7 +79,7 @@ export_year <- function(Y) {
   cat(sprintf("== %d ==\n", Y))
 
   # ---- step 00: the grand municipal input ---------------------------------
-  f00 <- sprintf("data/generated/outputs/00_%d/SOY_MUN_00.rds", Y)
+  f00 <- sprintf(file.path(DATA_DIR, "generated/outputs/00_%d/SOY_MUN_00.rds"), Y)
   if (file.exists(f00)) {
     s <- as.data.table(readRDS(f00))
     # names/state live in dim_municipality; everything else is kept verbatim
@@ -85,8 +89,8 @@ export_year <- function(Y) {
   } else cat("  [miss]", f00, "\n")
 
   # ---- step 00: raw COMEX soy trade (pre-CBS-balancing) --------------------
-  fe <- sprintf("data/generated/outputs/00_%d/EXP_MUN_SOY_00.rds", Y)
-  fi <- sprintf("data/generated/outputs/00_%d/IMP_MUN_SOY_00.rds", Y)
+  fe <- sprintf(file.path(DATA_DIR, "generated/outputs/00_%d/EXP_MUN_SOY_00.rds"), Y)
+  fi <- sprintf(file.path(DATA_DIR, "generated/outputs/00_%d/IMP_MUN_SOY_00.rds"), Y)
   if (file.exists(fe) && file.exists(fi)) {
     e <- as.data.table(readRDS(fe))
     i <- as.data.table(readRDS(fi))
@@ -103,7 +107,7 @@ export_year <- function(Y) {
   } else cat("  [miss]", fe, "\n")
 
   # ---- step 00: national FAO commodity balance ----------------------------
-  fc <- sprintf("data/generated/outputs/00_%d/CBS_SOY.rds", Y)
+  fc <- sprintf(file.path(DATA_DIR, "generated/outputs/00_%d/CBS_SOY.rds"), Y)
   if (file.exists(fc)) {
     cbs <- readRDS(fc)
     cbs <- data.table(product = rownames(cbs), as.data.table(cbs))
@@ -111,7 +115,7 @@ export_year <- function(Y) {
   } else cat("  [miss]", fc, "\n")
 
   # ---- step 02: livestock split into production systems -------------------
-  fl <- sprintf("data/generated/outputs/02_%d/LIVESTOCK_MUN_02.rds", Y)
+  fl <- sprintf(file.path(DATA_DIR, "generated/outputs/02_%d/LIVESTOCK_MUN_02.rds"), Y)
   if (file.exists(fl)) {
     l <- as.data.table(readRDS(fl))
     l[, nm_mun := NULL]
@@ -123,8 +127,8 @@ export_year <- function(Y) {
   } else cat("  [miss]", fl, "\n")
 
   # ---- step 03: feed demand per animal category ---------------------------
-  fb <- sprintf("data/generated/outputs/03_%d/bean_feed_t.rds", Y)
-  fk <- sprintf("data/generated/outputs/03_%d/cake_feed_t.rds", Y)
+  fb <- sprintf(file.path(DATA_DIR, "generated/outputs/03_%d/bean_feed_t.rds"), Y)
+  fk <- sprintf(file.path(DATA_DIR, "generated/outputs/03_%d/cake_feed_t.rds"), Y)
   if (file.exists(fb) && file.exists(fk)) {
     m <- function(f, v) {
       x <- readRDS(f)
@@ -141,7 +145,7 @@ export_year <- function(Y) {
 
 # ---- once: FAOSTAT bilateral trade benchmark (all years in one file) -------
 export_faostat <- function() {
-  src <- "data/raw/04/FAOSTAT_tradematrix_BRAsoy_ALL.csv"
+  src <- file.path(DATA_DIR, "raw/04/FAOSTAT_tradematrix_BRAsoy_ALL.csv")
   if (!file.exists(src)) { cat("  [miss]", src, "\n"); return(invisible()) }
   x <- fread(src)
   setnames(x, c("Partner Country Code (ISO3)", "Partner Countries"),

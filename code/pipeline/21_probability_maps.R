@@ -1,11 +1,15 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
-    length(list.files("data/fabio/v2/inst")) == 0) {
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
+    length(list.files(file.path(DATA_DIR, "fabio/v2/inst"))) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
@@ -51,12 +55,12 @@ burn_rast_tmpsafe <- function(x, ...) {
 
 # prepare footprint results ----------------------------------
 
-regions <- fread("data/fabio/v2/inst/regions_full.csv")
-items <-  fread("data/fabio/v2/inst/items_full.csv")
+regions <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+items <-  fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
 
 # load production footprints
-P_mass  <- readRDS(paste0("data/generated/footprints/", YEAR, "_P_mass.rds"))
-P_value <- readRDS(paste0("data/generated/footprints/", YEAR, "_P_value.rds"))
+P_mass  <- readRDS(paste0(DATA_DIR, "/generated/footprints/", YEAR, "_P_mass.rds"))
+P_value <- readRDS(paste0(DATA_DIR, "/generated/footprints/", YEAR, "_P_value.rds"))
 
 # bind 
 P_mass <-  cbind(P_mass$A_country,  P_mass$B_country,  P_mass$A_product,  P_mass$B_product,  
@@ -68,8 +72,8 @@ P_value <- cbind(P_value$A_country, P_value$B_country, P_value$A_product, P_valu
 
 
 # load MU polygons and project to WGS84
-GEO_MUN_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds")) %>% st_transform(crs = 4326)
-GEO_states <- st_read("data/geo/GADM_boundaries/gadm36_BRA_1.shp", stringsAsFactors = FALSE) %>% st_transform(crs = 4326)
+GEO_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds")) %>% st_transform(crs = 4326)
+GEO_states <- st_read(file.path(DATA_DIR, "geo/GADM_boundaries/gadm36_BRA_1.shp"), stringsAsFactors = FALSE) %>% st_transform(crs = 4326)
 
 
 # S3 method: makes is.finite() work on the data.frames below (base errors on lists)
@@ -109,14 +113,14 @@ GEO_MUN_P_value <- dplyr::select(GEO_MUN_SOY, c(co_mun:nm_state, prod_bean)) %>%
 # this uses the burn_rast function from the function library
 
 # load tiles in a list
-tile_names = list.files("data/geo/mb_tiles/",pattern="^.*.tif$")
+tile_names = list.files(file.path(DATA_DIR, "geo/mb_tiles/"),pattern="^.*.tif$")
 if (length(tile_names) == 0) {
   stop("[step 21] No MapBiomas soy land-use tiles found in data/geo/mb_tiles/. ",
        "These 30m tiles must be downloaded from Google Earth Engine (see README / ",
        "DATA.md). The municipal footprints (step 20) are complete; only the ",
        "grid-level refinement in this step is blocked.", call. = FALSE)
 }
-tile_paths = paste0("data/geo/mb_tiles/",tile_names)
+tile_paths = paste0(DATA_DIR, "/geo/mb_tiles/",tile_names)
 tiles <- lapply(tile_paths, raster)
 names(tiles) <- tile_names
 
@@ -131,7 +135,7 @@ names(tiles) <- tile_names
 # ONLY probability maps we produce. Single small countries (DEU, ESP, ...)
 # are pointless here: their per-municipality shares are <0.5% everywhere and
 # round to an empty map at the integer-percent resolution of the tiles.
-reg_tbl <- fread("data/fabio/v2/inst/regions_full.csv")
+reg_tbl <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
 eu27    <- reg_tbl$iso3c[reg_tbl$EU27 == TRUE]
 cont    <- setNames(reg_tbl$continent, reg_tbl$iso3c)
 grp_of  <- function(iso) ifelse(iso == "BRA", "Brazil-domestic",
@@ -253,7 +257,9 @@ for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domesti
 
 # or by product
 
-for (prod in c("total_food", "total_nonfood")) { # c110/c114/c116/c117/c118 dropped: codes are FABIO v1 numbering, in v2 they hit Butter/Mutton/Poultry/OtherMeat/Offals - remap before reusing
+## CHANGED: product codes ported from FABIO v1.1 to v2 numbering (v1.1 c110 Milk = v2 c109,
+# c114 Bovine = c113, c116 Pigmeat = c115, c117 Poultry = c116, c118 Other meat = c117)
+for (prod in c("c109", "c113", "c115", "c116", "c117", "total_food", "total_nonfood")) { # 
   for(alloc in c("value")){ # "mass",
     
     # or: select product

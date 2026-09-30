@@ -17,11 +17,16 @@ The .parquet layout (under data/generated/outputs/05_YYYY/parquet/ and data/gene
         cols: from, to, distance  (NA / negative entries already dropped)
 """
 from __future__ import annotations
+import os
 from pathlib import Path
 from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
+
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
 
 try:
     import pyreadr
@@ -60,8 +65,8 @@ def _read_rdata(path: Path) -> Dict[str, pd.DataFrame]:
 # -- High-level loaders ------------------------------------------------------
 def load_soy_mun(year: int) -> pd.DataFrame:
     """Load SOY_MUN_fin - per-município supply/demand. Prefers parquet."""
-    pq = Path(f"data/generated/outputs/05_{year}/parquet/SOY_MUN_fin.parquet")
-    rds = Path(f"data/generated/outputs/05_{year}/SOY_MUN_fin.rds")
+    pq = DATA_DIR / f"generated/outputs/05_{year}/parquet/SOY_MUN_fin.parquet"
+    rds = DATA_DIR / f"generated/outputs/05_{year}/SOY_MUN_fin.rds"
     if pq.exists():
         df = _read_parquet(pq)
     elif rds.exists():
@@ -86,7 +91,7 @@ def load_step06_artifacts(year: int) -> dict:
 
     Distance matrices come back as 2D pandas DataFrames indexed by node id.
     """
-    base = Path(f"data/generated/outputs/06_{year}")
+    base = DATA_DIR / f"generated/outputs/06_{year}"
     if not base.exists():
         raise FileNotFoundError(
             f"{base} does not exist - step 06 has not been run for {year}.\n"

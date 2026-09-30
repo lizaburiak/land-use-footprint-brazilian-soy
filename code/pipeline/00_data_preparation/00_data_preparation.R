@@ -52,6 +52,10 @@
 #
 ###############################################################################
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 library(dplyr)
 library(openxlsx)
 library(tidyr)
@@ -77,7 +81,7 @@ cat("============================================================\n")
 cat("Script 00: Data Preparation for year", YEAR, "\n")
 cat("============================================================\n\n")
 
-OUT <- paste0("data/generated/outputs/00_", YEAR, "/")
+OUT <- paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/")
 dir.create(OUT, recursive = TRUE, showWarnings = FALSE)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -133,7 +137,7 @@ cat("Loading data for year", YEAR, "...\n")
 #           co_state (2-digit state code), nm_state (2-letter abbreviation)
 # Available years: 2000,2001,2005,2007,2010,2013-2022 (from geobr)
 mun_info <- find_year_file(
-  "data/raw/00/IBGE_municipalities/GEO_MUN_{Y}_IBGE.xlsx", YEAR)
+  file.path(DATA_DIR, "raw/00/IBGE_municipalities/GEO_MUN_{Y}_IBGE.xlsx"), YEAR)
 MUN <- openxlsx::read.xlsx(mun_info$file)
 cat("  Municipality codes:", nrow(MUN), "from year", mun_info$year, "\n")
 
@@ -142,26 +146,26 @@ cat("  Municipality codes:", nrow(MUN), "from year", mun_info$year, "\n")
 # Semicolon-separated CSV, one file per year. Available: 2000-2025.
 # We filter for soy HS4 codes later: 1201 (beans), 1507 (oil), 2304 (cake).
 EXP_MUN <- read.csv2(
-  file = paste0("data/raw/00/COMEX_exports/EXP_", YEAR, "_MUN_COMEX.csv"),
+  file = paste0(DATA_DIR, "/raw/00/COMEX_exports/EXP_", YEAR, "_MUN_COMEX.csv"),
   header = TRUE, stringsAsFactors = FALSE)
 IMP_MUN <- read.csv2(
-  file = paste0("data/raw/00/COMEX_imports/IMP_", YEAR, "_MUN_COMEX.csv"),
+  file = paste0(DATA_DIR, "/raw/00/COMEX_imports/IMP_", YEAR, "_MUN_COMEX.csv"),
   header = TRUE, stringsAsFactors = FALSE)
 
 # Lookup tables for COMEX municipality codes -> names and country codes -> names
 # These are static (backward-compatible across all years).
 COMEX_MUN <- read.csv2(
-  file = "data/raw/00/COMEX_codes/UF_MUN_COMEX.csv",
+  file = file.path(DATA_DIR, "raw/00/COMEX_codes/UF_MUN_COMEX.csv"),
   header = TRUE, fileEncoding = "ISO-8859-1", stringsAsFactors = FALSE)
 PAIS <- read.csv2(
-  file = "data/raw/00/COMEX_codes/PAIS_COMEX.csv",
+  file = file.path(DATA_DIR, "raw/00/COMEX_codes/PAIS_COMEX.csv"),
   header = TRUE, fileEncoding = "ISO-8859-1")
 
 # -- 1.3 Soy production (IBGE PAM, Table 1612) -------------------------------
 # Area planted, area harvested, production quantity by municipality.
 # Available: 2000-2024 yearly. CSV with 2 header rows (skip=2).
 prod_info <- find_year_file(
-  "data/raw/00/IBGE_production/Production_tabela1612_IBGE_{Y}.csv", YEAR)
+  file.path(DATA_DIR, "raw/00/IBGE_production/Production_tabela1612_IBGE_{Y}.csv"), YEAR)
 PROD_MUN <- read.csv(
   file = prod_info$file, header = TRUE, skip = 2,
   encoding = "UTF-8", stringsAsFactors = FALSE)
@@ -175,7 +179,7 @@ PROD_MUN <- read.csv(
 #     per_plant_cap = state_cap_td[s, y] / n_active_soy_plants[s, y]
 #   Plants change between 2024 and 2025, so the roster is filtered per year.
 #   For years outside {2024, 2025} we fall back to the 2024 roster as a proxy.
-ABIOVE_CAP_FILE <- "data/raw/00/ABIOVE_processing/ABIOVE_raw_capacity_2025.xlsx"
+ABIOVE_CAP_FILE <- file.path(DATA_DIR, "raw/00/ABIOVE_processing/ABIOVE_raw_capacity_2025.xlsx")
 
 # Map: year -> Ativa-column index in sheet 2 (R 1-based; openxlsx drops col A).
 YEAR_COL_MAP <- list(
@@ -234,7 +238,7 @@ YEAR_COL_MAP <- list(
 #                         2025 file holds 2025/2024.
 # For missing years (2000, 2001, 2002, 2016, 2017, 2021) we fall back to the
 # closest available LOWER-BOUND year.
-.PLANT_PATH <- "data/raw/00/ABIOVE_processing"
+.PLANT_PATH <- file.path(DATA_DIR, "raw/00/ABIOVE_processing")
 .PLANT_INDEX <- list(
   "2003" = list(file = "pesquisa_capacidade_2003_PT.xls", era = "early", sheet = "unidproces"),
   "2004" = list(file = "pesquisa_capacidade_2004_PT.xls", era = "mid",   sheet = "geralproces"),  # 2004 uses the mid-era 'geralproces' sheet (no 'unidproces' like 2003)
@@ -516,7 +520,7 @@ cat("  Refining facilities:", nrow(REF_MUN_raw),
 #                   2022 = Census (semicolon CSV, CO_MUN column);
 #                   2024-2025 = post-census estimates (semicolon CSV).
 pop_info <- find_year_file(
-  "data/raw/00/IBGE_population/Population_tabela6579_IBGE_{Y}.csv", YEAR)
+  file.path(DATA_DIR, "raw/00/IBGE_population/Population_tabela6579_IBGE_{Y}.csv"), YEAR)
 if (pop_info$year %in% c(2022, 2024, 2025)) {
   pop_raw <- read.csv2(file = pop_info$file, header = TRUE, stringsAsFactors = FALSE)
   if ("CO_MUN" %in% names(pop_raw)) {
@@ -543,26 +547,26 @@ cat("  Population from year:", pop_info$year, "\n")
 # Available: 2000-2025 yearly. Semicolon CSV, skip=4.
 # Contains: 10 animal types per municipality.
 LSTOCK_MUN <- read.csv2(
-  file = paste0("data/raw/00/IBGE_livestock/Livestock_", YEAR, "_tabela3939_IBGE.csv"),
+  file = paste0(DATA_DIR, "/raw/00/IBGE_livestock/Livestock_", YEAR, "_tabela3939_IBGE.csv"),
   header = TRUE, skip = 4, encoding = "UTF-8", stringsAsFactors = FALSE)
 
 # -- 1.7 Milked cows (IBGE, Table 94) ----------------------------------------
 # Available: 2000-2024 yearly. Used to compute dairy cattle share.
 MILKCOWS_MUN <- read.csv2(
-  file = paste0("data/raw/00/IBGE_milkcows/MilkCows_", YEAR, "_tabela94_IBGE.csv"),
+  file = paste0(DATA_DIR, "/raw/00/IBGE_milkcows/MilkCows_", YEAR, "_tabela94_IBGE.csv"),
   header = TRUE, skip = 3, encoding = "UTF-8", stringsAsFactors = FALSE)
 
 # -- 1.8 Grain storage facilities (IBGE / CONAB) -----------------------------
 # Static: 2014 shapefile with individual warehouse locations and capacity (CAP_TON).
 # Aggregated to municipality level below.
-STORAGE_MUN <- st_read("data/raw/00/IBGE_storage/armazens_2014.shp", quiet = TRUE)
+STORAGE_MUN <- st_read(file.path(DATA_DIR, "raw/00/IBGE_storage/armazens_2014.shp"), quiet = TRUE)
 
 # -- 1.9 Per-capita soy oil acquisition (IBGE POF) ---------------------------
 # Three editions: 2002-03, 2008-09, 2017-18. By state (27 values).
 # Used to allocate national food use of soy oil to municipalities.
 # Lower bound: e.g. for YEAR=2013, uses POF 2008 edition.
 pof_info <- find_year_file(
-  "data/raw/00/IBGE_POF/POF_soy_oil_{Y}_IBGE.csv", YEAR)
+  file.path(DATA_DIR, "raw/00/IBGE_POF/POF_soy_oil_{Y}_IBGE.csv"), YEAR)
 OIL_ACQ_raw <- read.csv(pof_info$file, stringsAsFactors = FALSE)
 
 # Map full state names (e.g. "Rondônia") to 2-letter abbreviations ("RO")
@@ -603,10 +607,10 @@ if (YEAR < 2008) {
   DIESEL_MAT_REG <- data.frame(X1 = numeric(0))
 } else {
   diesel_info <- find_year_file(
-    "data/raw/00/ANP_biodiesel/Biodiesel_capacity_{Y}_ANP.xlsx", YEAR)
+    file.path(DATA_DIR, "raw/00/ANP_biodiesel/Biodiesel_capacity_{Y}_ANP.xlsx"), YEAR)
   if (!file.exists(diesel_info$file)) {
     diesel_info <- find_year_file(
-      "data/raw/00/ANP_biodiesel/Biodiesel_capacity_{Y}_ANP_original.xlsx", YEAR)
+      file.path(DATA_DIR, "raw/00/ANP_biodiesel/Biodiesel_capacity_{Y}_ANP_original.xlsx"), YEAR)
   }
   DIESEL_CAP_MUN <- openxlsx::read.xlsx(
     diesel_info$file, sheet = "capacity", startRow = 2, colNames = TRUE)
@@ -621,7 +625,7 @@ if (YEAR < 2008) {
     cat("  [NOTE] Materials sheet not available for", diesel_info$year,
         "- using 2013 original\n")
     DIESEL_MAT_REG <<- openxlsx::read.xlsx(
-      "data/raw/00/ANP_biodiesel/Biodiesel_capacity_2013_ANP_original.xlsx",
+      file.path(DATA_DIR, "raw/00/ANP_biodiesel/Biodiesel_capacity_2013_ANP_original.xlsx"),
       sheet = "materials", startRow = 2, colNames = TRUE)
   })
   cat("  Biodiesel (ANP) from year:", diesel_info$year, "\n")
@@ -1104,7 +1108,7 @@ cat("  Processing:", sum(SOY_MUN$proc_cap), "t/day\n")
 # merge with SOY_MUN, and project to SIRGAS 2000 Brazil Polyconic (EPSG:5880).
 
 bnd_info <- find_year_file(
-  "data/raw/00/IBGE_boundaries/municipios_{Y}.gpkg", YEAR)
+  file.path(DATA_DIR, "raw/00/IBGE_boundaries/municipios_{Y}.gpkg"), YEAR)
 GEO_MUN <- st_read(bnd_info$file, stringsAsFactors = FALSE, quiet = TRUE)
 GEO_MUN <- GEO_MUN %>% rename(co_mun = code_muni, nm_mun = name_muni)
 GEO_MUN$co_mun <- as.numeric(GEO_MUN$co_mun)
@@ -1137,7 +1141,7 @@ GEO_BRA_EXT <- st_as_sfc(st_bbox(GEO_MUN_SOY))
 # Source: IBGE Localities 2010 shapefile (CD_NIVEL=1 = capital).
 
 MUN_localities <- st_read(
-  "data/raw/00/IBGE_localities/BR_Localidades_2010_v1.shx",
+  file.path(DATA_DIR, "raw/00/IBGE_localities/BR_Localidades_2010_v1.shx"),
   stringsAsFactors = FALSE, quiet = TRUE)
 MUN_capitals <- MUN_localities %>%
   filter(CD_NIVEL == 1) %>%

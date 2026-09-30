@@ -1,6 +1,10 @@
 
 ##### Computation of transport cost matrices for truck, train and ship based on logistic networks #######
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -24,32 +28,32 @@ library(janitor)
 write = TRUE
 
 # output directory ------------------------------------------------------------
-out_dir <- paste0("data/generated/outputs/06_", YEAR)
+out_dir <- paste0(DATA_DIR, "/generated/outputs/06_", YEAR)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # load data -------------------------------------------------------------------
 
 # MU polygons
-SOY_MUN <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
-GEO_MUN_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds"))
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
+GEO_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds"))
 
 # OSM roads
-osm2014 <- st_read("data/geo/OSM_logistic_network/gis_osm_roads_free_1.shp", stringsAsFactors = FALSE)
+osm2014 <- st_read(file.path(DATA_DIR, "geo/OSM_logistic_network/gis_osm_roads_free_1.shp"), stringsAsFactors = FALSE)
 
 # DNIT waterway lines data
-water <- st_read("data/geo/DNIT_logistic_network/Hidrovias.shp", stringsAsFactors = FALSE)
+water <- st_read(file.path(DATA_DIR, "geo/DNIT_logistic_network/Hidrovias.shp"), stringsAsFactors = FALSE)
 # ANTAQ ports and cargo data
-ports <- st_read("data/geo/ANTAQ/IP.shp", stringsAsFactors = FALSE, options = "ENCODING=WINDOWS-1252")
+ports <- st_read(file.path(DATA_DIR, "geo/ANTAQ/IP.shp"), stringsAsFactors = FALSE, options = "ENCODING=WINDOWS-1252")
 # year-parameterized cargo files; ANTAQ cargo files exist here only for 2017-2022.
 # For other years fall back to Stefan's 2013 ANTAQ data (the version he used).
-.antaq_cargo <- paste0("data/geo/ANTAQ/", YEAR, "Carga.txt")
-.antaq_cont  <- paste0("data/geo/ANTAQ/", YEAR, "Carga_Conteinerizada.txt")
+.antaq_cargo <- paste0(DATA_DIR, "/geo/ANTAQ/", YEAR, "Carga.txt")
+.antaq_cont  <- paste0(DATA_DIR, "/geo/ANTAQ/", YEAR, "Carga_Conteinerizada.txt")
 if (!file.exists(.antaq_cargo)) {
   # fallback chain: Stefan's 2013 download (his original design), else the nearest
   # year among the ANTAQ files on disk (2017-2022; ANTAQ's server has been down,
   # blocking re-download of <=2016 - see WHAT_IS_MISSING.md item 4)
-  .have <- as.integer(gsub("Carga\\.txt$", "", basename(Sys.glob("data/geo/ANTAQ/[0-9][0-9][0-9][0-9]Carga.txt"))))
-  if (file.exists("data/geo/ANTAQ/2013Carga.txt")) {
+  .have <- as.integer(gsub("Carga\\.txt$", "", basename(Sys.glob(file.path(DATA_DIR, "geo/ANTAQ/[0-9][0-9][0-9][0-9]Carga.txt")))))
+  if (file.exists(file.path(DATA_DIR, "geo/ANTAQ/2013Carga.txt"))) {
     .fb <- 2013
   } else if (length(.have) > 0) {
     .fb <- .have[which.min(abs(.have - YEAR))]
@@ -57,20 +61,20 @@ if (!file.exists(.antaq_cargo)) {
     stop("No ANTAQ cargo for YEAR=", YEAR, " and no fallback files present.")
   }
   message("[06] ANTAQ cargo: no ", YEAR, " file; using ", .fb, " as proxy for water cargo/capacities")
-  .antaq_cargo <- paste0("data/geo/ANTAQ/", .fb, "Carga.txt")
-  .antaq_cont  <- paste0("data/geo/ANTAQ/", .fb, "Carga_Conteinerizada.txt")
+  .antaq_cargo <- paste0(DATA_DIR, "/geo/ANTAQ/", .fb, "Carga.txt")
+  .antaq_cont  <- paste0(DATA_DIR, "/geo/ANTAQ/", .fb, "Carga_Conteinerizada.txt")
 }
 cargo_water <- read.csv2(.antaq_cargo, encoding = "UTF-8", stringsAsFactors = FALSE)
 cargo_water_cont <- read.csv2(.antaq_cont, encoding = "UTF-8", stringsAsFactors = FALSE)
 
 # ANTT rail lines, stations and cargo data
-rail <-  st_read("data/geo/ANTT/Linhas.shp", stringsAsFactors = FALSE)
-stations <- st_read("data/geo/ANTT/Estacoes.shp", stringsAsFactors = FALSE)
+rail <-  st_read(file.path(DATA_DIR, "geo/ANTT/Linhas.shp"), stringsAsFactors = FALSE)
+stations <- st_read(file.path(DATA_DIR, "geo/ANTT/Estacoes.shp"), stringsAsFactors = FALSE)
 # stations_man (train_stations_soy.gpkg) was loaded here but never used - dropped.
 # Rail cargo: raw ANTT OD CSVs (data/geo/ANTT/RailCargo_od/, 2006-2023) replace
 # Stefan's compiled xls. Reshaped to the xls sheet layout the code below expects;
 # monthly rows are fine (aggregated by the group_by+sum further down).
-.rail_csv <- paste0("data/geo/ANTT/RailCargo_od/producao_origem_destino_", YEAR, ".csv")
+.rail_csv <- paste0(DATA_DIR, "/geo/ANTT/RailCargo_od/producao_origem_destino_", YEAR, ".csv")
 if (file.exists(.rail_csv)) {
   .cr <- read.csv2(.rail_csv, fileEncoding = "latin1", stringsAsFactors = FALSE,
                    colClasses = "character")
@@ -84,12 +88,12 @@ if (file.exists(.rail_csv)) {
   rm(.cr)
 } else {
   # legacy fallback: Stefan's compiled xls (one sheet per year), if present
-  cargo_rail <- xlsx::read.xlsx("data/geo/RailCargo_2006-21_ANTT.xls", sheetName = as.character(YEAR))
+  cargo_rail <- xlsx::read.xlsx(file.path(DATA_DIR, "geo/RailCargo_2006-21_ANTT.xls"), sheetName = as.character(YEAR))
 }
 
 # MU capitals (year-invariant; step 05 does not copy them per year - use base/)
-.mc <- paste0("data/generated/outputs/05_", YEAR, "/MUN_capitals.rds")
-if (!file.exists(.mc)) .mc <- "data/generated/base/MUN_capitals.rds"
+.mc <- paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/MUN_capitals.rds")
+if (!file.exists(.mc)) .mc <- file.path(DATA_DIR, "generated/base/MUN_capitals.rds")
 MUN_capitals <- readRDS(.mc)
 # align capitals 1:1 with SOY_MUN rows - the base capitals file carries two extra
 # non-municipality IBGE water-body codes (4300001/4300002), and the road distance
@@ -337,7 +341,7 @@ ports_dest <- filter(ports, cdi_tuaria %in% cargo_water$Destino)
 unique(cargo_water$Origem)[!unique(cargo_water$Origem) %in% ports_orig$cdi_tuaria]
 unique(cargo_water$Destino)[!unique(cargo_water$Destino) %in% ports_dest$cdi_tuaria]
 
-ports_add <- st_read("data/geo/ANTAQ/ip_add.gpkg", stringsAsFactors = FALSE)
+ports_add <- st_read(file.path(DATA_DIR, "geo/ANTAQ/ip_add.gpkg"), stringsAsFactors = FALSE)
 ports_add <- rename(ports_add, geometry = geom) %>% st_set_geometry("geometry")
 ports <- rbind(ports, ports_add)
 ports_orig <- filter(ports, cdi_tuaria %in% cargo_water$Origem)

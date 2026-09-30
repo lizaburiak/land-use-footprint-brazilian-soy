@@ -9,6 +9,10 @@
 # (The former diagnostic benchmark maps / scatter panels / regression tables were
 #  retired 2026-08; see git history. The paper's scatter is code/analysis/rocket_plot.py.)
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -32,17 +36,17 @@ dir.create(tab_dir, showWarnings = FALSE, recursive = TRUE)
 
 # If step 10 produced no benchmark (no TRASE data for this year, e.g. < 2004),
 # there is nothing to analyse - skip cleanly.
-.comp_path <- paste0("data/generated/outputs/10_", YEAR, "/comp_list.rds")
+.comp_path <- paste0(DATA_DIR, "/generated/outputs/10_", YEAR, "/comp_list.rds")
 if (!file.exists(.comp_path)) {
   message("[11] No benchmark for YEAR=", YEAR, " (", .comp_path,
           " missing - no TRASE data). Skipping analysis.")
   quit(save = "no", status = 0)
 }
 
-SOY_MUN <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
-GEO_MUN_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds"))
-comp_list <- readRDS(paste0("data/generated/outputs/10_", YEAR, "/comp_list.rds"))
-MUN_capital_dist <- readRDS(paste0("data/generated/outputs/00_", YEAR, "/MUN_capital_dist.rds"))  # produced by step 00
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
+GEO_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds"))
+comp_list <- readRDS(paste0(DATA_DIR, "/generated/outputs/10_", YEAR, "/comp_list.rds"))
+MUN_capital_dist <- readRDS(paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/MUN_capital_dist.rds"))  # produced by step 00
 class(MUN_capital_dist) <- "numeric"
 # Subset distance matrix to municipalities present in SOY_MUN. Step 00 emits a
 # 5572-row matrix; step 05 filters SOY_MUN down to 5570. Without this, logical
@@ -59,8 +63,8 @@ if (any(!.in_dist)) {
   .mun <- .mun[.in_dist]
 }
 MUN_capital_dist <- MUN_capital_dist[.mun, .mun]
-EXP_NAT_wide <- readRDS(paste0("data/generated/outputs/10_", YEAR, "/EXP_NAT_wide.rds"))
-CBS_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/CBS_SOY_bal.rds"))
+EXP_NAT_wide <- readRDS(paste0(DATA_DIR, "/generated/outputs/10_", YEAR, "/EXP_NAT_wide.rds"))
+CBS_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/CBS_SOY_bal.rds"))
 
 # extract only required columns from benchmark tables, renaming "mean" to "multimode"
 comp_list <- lapply(comp_list, function(comp){dplyr::select(comp,co_state:multimode_mean) %>% rename(multimode = multimode_mean)})

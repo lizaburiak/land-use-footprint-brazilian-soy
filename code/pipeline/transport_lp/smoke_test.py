@@ -12,6 +12,7 @@ Usage:
   python code/pipeline/transport_lp/smoke_test.py 2013        # run smoke test
 """
 from __future__ import annotations
+import os
 import argparse
 import sys
 from pathlib import Path
@@ -25,17 +26,21 @@ from transport_lp.cost_perturbation import central
 from transport_lp.model import build_model, solve_model, extract_flows
 from transport_lp.write_output import consolidate_flows
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
 
 def load_fixture(year: int, suffix: str) -> tuple[pd.DataFrame, dict]:
     """Read the parquet fixture produced by make_fixture.py."""
-    soy_pq = Path(f"data/generated/outputs/05_{year}_{suffix}/parquet/SOY_MUN_fin.parquet")
+    soy_pq = DATA_DIR / f"generated/outputs/05_{year}_{suffix}/parquet/SOY_MUN_fin.parquet"
     if not soy_pq.exists():
         sys.exit(f"Fixture not found at {soy_pq}. "
                  f"Run: python code/pipeline/transport_lp/make_fixture.py {year}")
     soy = pd.read_parquet(soy_pq)
     soy["co_mun"] = soy["co_mun"].astype(str)
 
-    pq_dir = Path(f"data/generated/outputs/06_{year}_{suffix}/parquet")
+    pq_dir = DATA_DIR / f"generated/outputs/06_{year}_{suffix}/parquet"
     if not pq_dir.exists():
         sys.exit(f"Step-06 fixture not found at {pq_dir}. Run make_fixture.py.")
 

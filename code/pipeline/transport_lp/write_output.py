@@ -9,11 +9,16 @@ columns:
     value    numeric  (total tonnes routed orig->dest via all mode combinations)
 """
 from __future__ import annotations
+import os
 from pathlib import Path
 from typing import Dict
 
 import numpy as np
 import pandas as pd
+
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
 
 try:
     import pyreadr
@@ -142,7 +147,7 @@ def write_iteration_rds(
     if not HAVE_PYREADR:
         raise ImportError("pyreadr required to write .rds (pip install pyreadr)")
     if bs_res_dir is None:
-        bs_res_dir = Path(f"data/generated/outputs/gams/bs_res_{year}")
+        bs_res_dir = DATA_DIR / f"generated/outputs/gams/bs_res_{year}"
     bs_res_dir = Path(bs_res_dir)
     bs_res_dir.mkdir(parents=True, exist_ok=True)
 

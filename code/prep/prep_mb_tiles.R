@@ -16,6 +16,10 @@
 #   YEAR       year to build (must match the *_P_mass.rds footprint vintage)
 #   NTILE_SIDE tiles per side of the grid (default 16 -> up to 256 tiles)
 # ============================================================================
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressMessages(library(terra))
 
 args    <- commandArgs(trailingOnly = TRUE)
@@ -23,7 +27,7 @@ YEAR    <- suppressWarnings(as.integer(args[1])); if (is.na(YEAR)) YEAR <- 2022
 NSIDE   <- suppressWarnings(as.integer(args[2])); if (is.na(NSIDE)) NSIDE <- 16
 SOYCODE <- 39L
 
-src <- sprintf("data/geo/_mb_staging/brasil_coverage_%d.tif", YEAR)
+src <- sprintf(file.path(DATA_DIR, "geo/_mb_staging/brasil_coverage_%d.tif"), YEAR)
 if (!file.exists(src)) stop("Coverage raster not found: ", src, call. = FALSE)
 
 terraOptions(memfrac = 0.6, progress = 0)
@@ -32,7 +36,7 @@ message("[prep_mb_tiles] reclassifying soy (class ", SOYCODE, ") -> 1 for ", YEA
 r   <- rast(src)
 soy <- ifel(r == SOYCODE, 1L, NA)
 
-soy_file <- sprintf("data/geo/_mb_staging/soy_%d.tif", YEAR)
+soy_file <- sprintf(file.path(DATA_DIR, "geo/_mb_staging/soy_%d.tif"), YEAR)
 writeRaster(soy, soy_file, datatype = "INT1U", overwrite = TRUE,
             gdal = c("COMPRESS=DEFLATE", "PREDICTOR=2", "ZLEVEL=6"), NAflag = 0)
 
@@ -42,7 +46,7 @@ tmpl <- rast(ext(soy), nrow = NSIDE, ncol = NSIDE, crs = crs(soy))
 message("[prep_mb_tiles] cutting into up to ", NSIDE * NSIDE, " tiles")
 soy <- rast(soy_file)
 tiles <- makeTiles(soy, tmpl,
-                   filename = sprintf("data/geo/mb_tiles/soy%d_.tif", YEAR),
+                   filename = sprintf(file.path(DATA_DIR, "geo/mb_tiles/soy%d_.tif"), YEAR),
                    datatype = "INT1U", na.rm = TRUE, overwrite = TRUE,
                    gdal = c("COMPRESS=DEFLATE", "PREDICTOR=2", "ZLEVEL=6"))
 

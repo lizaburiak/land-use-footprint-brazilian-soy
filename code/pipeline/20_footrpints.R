@@ -1,11 +1,15 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
-    length(list.files("data/fabio/v2/inst")) == 0) {
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
+    length(list.files(file.path(DATA_DIR, "fabio/v2/inst"))) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
@@ -20,30 +24,30 @@ library(countrycode)
 
 write = TRUE
 
-LA_mass <- readRDS(paste0("data/generated/fabio/", YEAR, "_L_mass.rds"))
-LB_mass <- readRDS(paste0("data/generated/fabio/", YEAR, "_B_inv_mass.rds"))
-LA_value <- readRDS(paste0("data/generated/fabio/", YEAR, "_L_value.rds"))
-LB_value <- readRDS(paste0("data/generated/fabio/", YEAR, "_B_inv_value.rds"))
-X <- readRDS("data/generated/fabio/X.rds")
-YA <- readRDS("data/generated/fabio/Y_hybrid.rds")
+LA_mass <- readRDS(paste0(DATA_DIR, "/generated/fabio/", YEAR, "_L_mass.rds"))
+LB_mass <- readRDS(paste0(DATA_DIR, "/generated/fabio/", YEAR, "_B_inv_mass.rds"))
+LA_value <- readRDS(paste0(DATA_DIR, "/generated/fabio/", YEAR, "_L_value.rds"))
+LB_value <- readRDS(paste0(DATA_DIR, "/generated/fabio/", YEAR, "_B_inv_value.rds"))
+X <- readRDS(file.path(DATA_DIR, "generated/fabio/X.rds"))
+YA <- readRDS(file.path(DATA_DIR, "generated/fabio/Y_hybrid.rds"))
 YA <- YA[[as.character(YEAR)]]
-load(paste0("data/exiobase/pxp/", YEAR, "_Y.RData"))
+load(paste0(DATA_DIR, "/exiobase/pxp/", YEAR, "_Y.RData"))
 YB <- as(Y, "sparseMatrix"); rm(Y)
-load("data/exiobase/Y.codes.RData")
-load("data/exiobase/pxp/IO.codes.RData")
+load(file.path(DATA_DIR, "exiobase/Y.codes.RData"))
+load(file.path(DATA_DIR, "exiobase/pxp/IO.codes.RData"))
 # PRE-2010: v2's E.rds starts in 2010; the v1.1 build's E (data/fabio/v1.1/, from
 # /mnt/nfs_fineprint/tmp/fabio/v1.1/) covers 1986-2013 as a long table -- the exact
 # format Stefan's original code consumed. Branch again below where the land-use
 # vector is built.
 # SOYPRINT_FORCE_V11=1 forces the v1.1 path on 2010+ years (vintage cross-checks).
 .use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
-Emat <- readRDS(if (.use_v11) "data/fabio/v1.1/E.rds" else
-                  "data/fabio/v2/E.rds")[[as.character(YEAR)]]
-cbs <- readRDS("data/generated/fabio/cbs_final.rds")
+Emat <- readRDS(if (.use_v11) file.path(DATA_DIR, "fabio/v1.1/E.rds") else
+                  file.path(DATA_DIR, "fabio/v2/E.rds"))[[as.character(YEAR)]]
+cbs <- readRDS(file.path(DATA_DIR, "generated/fabio/cbs_final.rds"))
 areas <- unique(cbs[,.(area_code, area)])
 areas_mun <- areas[area_code > 1000,]
-regions <- fread("data/fabio/v2/inst/regions_full.csv")
-items <- fread("data/fabio/v2/inst/items_full.csv")
+regions <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+items <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
 
 
 # prepare land-use data ------------------------------------------------------------------------
@@ -81,7 +85,7 @@ cat("[20] national land rows matched:", length(.nat_hit), "/", length(nat_lu), "
 # municipal soy land (ha): soybean process = c021, key "co_mun_c021" = harvested soy area.
 # NB: use area_harv (sum ~37 Mha, matches IBGE); SOY_MUN$area_plant actually holds production
 # tonnes here (sum == prod_bean), not hectares.
-soy_mun <- as.data.table(readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds")))
+soy_mun <- as.data.table(readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds")))
 mun_lu  <- setNames(as.numeric(soy_mun$area_harv),
                     paste0(as.character(soy_mun$co_mun), "_c021"))
 .mun_hit <- intersect(names(mun_lu), proc_names)
@@ -137,6 +141,8 @@ colnames(PB_value) <- paste0(colnames(PB_value),"_nonfood")
 # calculate municipal land-use footprints by country
 l <- landuse / as.vector(X)
 l[!is.finite(l)] <- 0
+# CHANGED: |X| < 1e-6 t is floating-point residue (e.g. -1.3e-21 t); land / X exploded to +-1e20 ha in 2013
+l[abs(as.vector(X)) < 1e-6] <- 0
 FA_mass  <- l*PA_mass
 FA_value <- l*PA_value
 FB_mass  <- l*PB_mass 
@@ -162,6 +168,8 @@ PB_value_product <- LB_value %*% YB_product
 # calculate municipal land-use footprints by product
 l <- landuse / as.vector(X)
 l[!is.finite(l)] <- 0
+# CHANGED: |X| < 1e-6 t is floating-point residue (e.g. -1.3e-21 t); land / X exploded to +-1e20 ha in 2013
+l[abs(as.vector(X)) < 1e-6] <- 0
 FA_mass_product  <-  l*PA_mass_product
 FA_value_product <- l*PA_value_product
 FB_mass_product  <-  l*PB_mass_product 
@@ -171,12 +179,13 @@ FB_value_product <- l*PB_value_product
 # for specifically relevant consumer products by country:
 
 # define relevant products:
-prod_sel <- list("c110", "c111", "c112", "c114", "c115", "c116", "c117", "c118")
+# CHANGED: codes ported from FABIO v1.1 to v2 numbering (v1.1 c110 Milk = v2 c109, v1.1 c114 Bovine Meat = v2 c113, ...)
+prod_sel <- list("c109", "c110", "c111", "c113", "c114", "c115", "c116", "c117")
 names(prod_sel) <- items$item[match(prod_sel, items$comm_code)]
-prod_group_sel <- list("dairy" = c("c110", "c111"), 
-                       "meat" = c("c114", "c115", "c116", "c117", "c118"),
-                       "meat-dairy" = c("c110", "c111", "c114", "c115", "c116", "c117", "c118"),
-                       "meat-dairy-eggs" = c("c110", "c111", "c112", "c114", "c115", "c116", "c117", "c118"))
+prod_group_sel <- list("dairy" = c("c109", "c110"), 
+                       "meat" = c("c113", "c114", "c115", "c116", "c117"),
+                       "meat-dairy" = c("c109", "c110", "c113", "c114", "c115", "c116", "c117"),
+                       "meat-dairy-eggs" = c("c109", "c110", "c111", "c113", "c114", "c115", "c116", "c117"))
 prod_sel <- c(prod_sel, prod_group_sel)
 
 PA_prod_country <-
@@ -206,10 +215,10 @@ F_value <- list("A_country" = FA_value, "B_country" = FB_value, "A_product" = FA
 
 # Store results -----------------------
 if (write){
-  saveRDS(P_mass , paste0("data/generated/footprints/", YEAR, "_P_mass.rds"))
-  saveRDS(P_value, paste0("data/generated/footprints/", YEAR, "_P_value.rds"))
-  saveRDS(F_mass , paste0("data/generated/footprints/", YEAR, "_F_mass.rds"))
-  saveRDS(F_value, paste0("data/generated/footprints/", YEAR, "_F_value.rds"))
+  saveRDS(P_mass , paste0(DATA_DIR, "/generated/footprints/", YEAR, "_P_mass.rds"))
+  saveRDS(P_value, paste0(DATA_DIR, "/generated/footprints/", YEAR, "_P_value.rds"))
+  saveRDS(F_mass , paste0(DATA_DIR, "/generated/footprints/", YEAR, "_F_mass.rds"))
+  saveRDS(F_value, paste0(DATA_DIR, "/generated/footprints/", YEAR, "_F_value.rds"))
 }
 
 rm(list = ls())

@@ -11,6 +11,10 @@
 #   Rscript code/pipeline/transport_lp/export_to_parquet.R 2013
 #   Rscript code/pipeline/transport_lp/export_to_parquet.R 2013 --force   # overwrite existing
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressPackageStartupMessages({
   library(dplyr)
   library(tidyr)
@@ -59,8 +63,8 @@ mat_to_long <- function(mat, from_name = "from", to_name = "to", val_name = "dis
 }
 
 # -- data/generated/outputs/00_YYYY/MUN_capital_dist.rds -> long parquet ----------------------
-out00 <- file.path(paste0("data/generated/outputs/00_", YEAR), "parquet")
-mun_dist_path <- paste0("data/generated/outputs/00_", YEAR, "/MUN_capital_dist.rds")
+out00 <- file.path(paste0(DATA_DIR, "/generated/outputs/00_", YEAR), "parquet")
+mun_dist_path <- paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/MUN_capital_dist.rds")
 if (file.exists(mun_dist_path)) {
   d <- readRDS(mun_dist_path)
   long <- mat_to_long(d, from_name = "from", to_name = "to", val_name = "distance")
@@ -69,10 +73,10 @@ if (file.exists(mun_dist_path)) {
 }
 
 # -- data/generated/outputs/05_YYYY ----------------------------------------------------------
-out05 <- file.path(paste0("data/generated/outputs/05_", YEAR), "parquet")
+out05 <- file.path(paste0(DATA_DIR, "/generated/outputs/05_", YEAR), "parquet")
 dir.create(out05, recursive = TRUE, showWarnings = FALSE)
 
-soy_mun_path <- paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds")
+soy_mun_path <- paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds")
 if (file.exists(soy_mun_path)) {
   soy_mun <- readRDS(soy_mun_path)
   if (inherits(soy_mun, "sf")) soy_mun <- sf::st_drop_geometry(soy_mun)
@@ -84,7 +88,7 @@ if (file.exists(soy_mun_path)) {
 }
 
 # -- data/generated/outputs/06_YYYY ----------------------------------------------------------
-src06 <- paste0("data/generated/outputs/06_", YEAR)
+src06 <- paste0(DATA_DIR, "/generated/outputs/06_", YEAR)
 out06 <- file.path(src06, "parquet")
 if (!dir.exists(src06)) {
   cat("[export] data/generated/outputs/06_", YEAR, " does not exist - step 06 not yet run.\n", sep="")

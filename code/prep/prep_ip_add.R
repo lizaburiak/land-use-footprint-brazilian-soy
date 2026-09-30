@@ -16,6 +16,10 @@
 # rbind()s after its co_mun join. Run from repo root:
 #   Rscript code/prep/prep_ip_add.R
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressMessages({
   library(sf)
   library(dplyr)
@@ -23,12 +27,12 @@ suppressMessages({
 
 # --- inputs -------------------------------------------------------------------
 
-GEO_MUN_SOY <- readRDS("data/generated/base/GEO_MUN_SOY_fin.rds")       # EPSG:5880
+GEO_MUN_SOY <- readRDS(file.path(DATA_DIR, "generated/base/GEO_MUN_SOY_fin.rds"))       # EPSG:5880
 if (!inherits(GEO_MUN_SOY, "sf")) stop("GEO_MUN_SOY_fin.rds is not sf")
-MUN_capitals <- readRDS("data/generated/base/MUN_capitals.rds")
-ports <- st_read("data/geo/ANTAQ/IP.shp", quiet = TRUE,
+MUN_capitals <- readRDS(file.path(DATA_DIR, "generated/base/MUN_capitals.rds"))
+ports <- st_read(file.path(DATA_DIR, "geo/ANTAQ/IP.shp"), quiet = TRUE,
                  options = "ENCODING=WINDOWS-1252", stringsAsFactors = FALSE)
-water <- st_read("data/geo/DNIT_logistic_network/Hidrovias.shp", quiet = TRUE,
+water <- st_read(file.path(DATA_DIR, "geo/DNIT_logistic_network/Hidrovias.shp"), quiet = TRUE,
                  stringsAsFactors = FALSE) |>
   st_transform(st_crs(GEO_MUN_SOY)) |>
   st_geometry() |>
@@ -94,7 +98,7 @@ ports_add <- st_sf(ports_add, geom = pts_5880)
 stopifnot(identical(setdiff(names(ports_add), "geom"),
                     c(names(st_drop_geometry(ports)), "co_mun")))
 
-st_write(ports_add, "data/geo/ANTAQ/ip_add.gpkg", driver = "GPKG",
+st_write(ports_add, file.path(DATA_DIR, "geo/ANTAQ/ip_add.gpkg"), driver = "GPKG",
          delete_dsn = TRUE, quiet = TRUE)
 cat("written: data/geo/ANTAQ/ip_add.gpkg with", nrow(ports_add), "ports\n")
 
@@ -108,7 +112,7 @@ ports06 <- ports |>
   mutate(co_mun_6 = substr(idcidade, 3, 8)) |>
   left_join(co_mun_lut, by = "co_mun_6") |>
   select(-co_mun_6)
-padd <- st_read("data/geo/ANTAQ/ip_add.gpkg", stringsAsFactors = FALSE, quiet = TRUE)
+padd <- st_read(file.path(DATA_DIR, "geo/ANTAQ/ip_add.gpkg"), stringsAsFactors = FALSE, quiet = TRUE)
 padd <- rename(padd, geometry = geom) |> st_set_geometry("geometry")
 ports_all <- rbind(ports06, padd)
 cat("rbind check: OK,", nrow(ports_all), "ports total\n")

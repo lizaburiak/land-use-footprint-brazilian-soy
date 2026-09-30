@@ -1,5 +1,9 @@
 ##### Generate benchmarks for sub-national supply chain results: TRASE & pure downscaling #####
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -19,7 +23,7 @@ write = TRUE
 
 options(scipen = 9999)
 
-out_dir <- paste0("data/generated/outputs/10_", YEAR)
+out_dir <- paste0(DATA_DIR, "/generated/outputs/10_", YEAR)
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 # load function library
@@ -28,18 +32,18 @@ source("code/pipeline/00_function_library.R")
 
 # load data ----------
 
-SOY_MUN <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
-EXP_MUN_SOY <- readRDS(paste0("data/generated/outputs/04_", YEAR, "/EXP_MUN_SOY.rds")) # exports before re-balancing according to cbs
-EXP_MUN_SOY_cbs <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/EXP_MUN_SOY_cbs.rds")) # after balancing
-CBS_SOY <- readRDS(paste0("data/generated/outputs/05_", YEAR, "/CBS_SOY_bal.rds"))
+SOY_MUN <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/SOY_MUN_fin.rds"))
+EXP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/04_", YEAR, "/EXP_MUN_SOY.rds")) # exports before re-balancing according to cbs
+EXP_MUN_SOY_cbs <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/EXP_MUN_SOY_cbs.rds")) # after balancing
+CBS_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/CBS_SOY_bal.rds"))
 
 # TRASE loading + schema adapter ----------------------------------------------------------
 # Stefan's code was written for TRASE v2.5.1 (UPPERCASE column names).
 # trase.earth now publishes v2.6.1 (lowercase columns, no LAND_USE_HA in composite,
 # no separate ISO3 column - uses 2-letter trase_ids instead). Detect and remap.
-.trase_year <- paste0("data/trase/BRAZIL_SOY_", YEAR, "_TRASE.csv")
-.trase_v25  <- "data/trase/BRAZIL_SOY_2.5.1_TRASE.csv"
-.trase_v26  <- "data/trase/brazil_soy_v2_6_1_composite.csv"
+.trase_year <- paste0(DATA_DIR, "/trase/BRAZIL_SOY_", YEAR, "_TRASE.csv")
+.trase_v25  <- file.path(DATA_DIR, "trase/BRAZIL_SOY_2.5.1_TRASE.csv")
+.trase_v26  <- file.path(DATA_DIR, "trase/brazil_soy_v2_6_1_composite.csv")
 .trase_path <- if (file.exists(.trase_year)) .trase_year else
                if (file.exists(.trase_v25))  .trase_v25  else
                if (file.exists(.trase_v26))  .trase_v26  else
@@ -96,12 +100,12 @@ if ("country_of_first_import" %in% colnames(trase) && !("COUNTRY" %in% colnames(
   trase_names <- NULL  # not needed - we built ISOA3 directly from trase_id
 } else {
   # v2.5.1 schema - original code path
-  trase_names <- read.csv2("data/trase/trase_names.csv", fileEncoding = "UTF-8-BOM", stringsAsFactors = FALSE)
+  trase_names <- read.csv2(file.path(DATA_DIR, "trase/trase_names.csv"), fileEncoding = "UTF-8-BOM", stringsAsFactors = FALSE)
 }
 
 # model results for source-to-importer flows
-source_to_export_mean <- readRDS(paste0("data/generated/outputs/08_", YEAR, "/source_to_export_mean.rds"))
-.list_path <- paste0("data/generated/outputs/08_", YEAR, "/source_to_export_list.rds")
+source_to_export_mean <- readRDS(paste0(DATA_DIR, "/generated/outputs/08_", YEAR, "/source_to_export_mean.rds"))
+.list_path <- paste0(DATA_DIR, "/generated/outputs/08_", YEAR, "/source_to_export_list.rds")
 if (file.exists(.list_path)) {
   source_to_export_list <- readRDS(.list_path)
   # drop the leading euclid entry from _list.rds before prepending the _mean version
@@ -114,7 +118,7 @@ if (file.exists(.list_path)) {
 # Deduplicate by name (when bootstrap is absent, both _mean and _sep contribute "euclid")
 source_to_export_list <- source_to_export_list[!duplicated(names(source_to_export_list))]
 
-regions <- readRDS(paste0("data/generated/outputs/04_", YEAR, "/regions.rds"))
+regions <- readRDS(paste0(DATA_DIR, "/generated/outputs/04_", YEAR, "/regions.rds"))
 regions_btd <- distinct(regions, CO_BTD, ISO_BTD) %>% arrange(CO_BTD)
 
 
@@ -138,10 +142,7 @@ EXP_NAT_wide = pivot_wider(EXP_NAT, id_cols = to_name, names_from = product, val
 
 
 source_shares <- mutate(SOY_MUN,
-                  # domestic-origin supply = (total_supply - imports): bit-identical to
-                  # production/total_supply under use_prop (total_supply = prod + imp), and
-                  # counts withdrawal-supplied tonnes as domestic under supply_side, where
-                  # total_supply includes |stock| (STOCK_MODE, step 05). See CHANGELOG.
+                  # domestic-origin supply = (total_supply - imports) = production (stock is on the use side, step 05)
                   source_share_bean = (total_supply_bean - imp_bean)/sum(total_supply_bean),
                   source_share_oil  = (total_supply_bean - imp_bean)/sum(total_supply_bean)*(sum(total_supply_oil)  - sum(imp_oil)) /sum(total_supply_oil),
                   source_share_cake = (total_supply_bean - imp_bean)/sum(total_supply_bean)*(sum(total_supply_cake) - sum(imp_cake))/sum(total_supply_cake)

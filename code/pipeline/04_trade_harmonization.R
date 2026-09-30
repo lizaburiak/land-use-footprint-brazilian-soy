@@ -1,6 +1,10 @@
 
 ###### Harmonize municipality exports and imports with FAO bilateral trade data ##############
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 # year argument (default 2013, range 2000-2022)
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
@@ -17,16 +21,16 @@ write <- TRUE
 
 # load data ------------------------------------------------------------------------------------
 
-EXP_MUN_SOY <- readRDS(paste0("data/generated/outputs/00_", YEAR, "/EXP_MUN_SOY_00.rds"))
-IMP_MUN_SOY <- readRDS(paste0("data/generated/outputs/00_", YEAR, "/IMP_MUN_SOY_00.rds"))
+EXP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/EXP_MUN_SOY_00.rds"))
+IMP_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/00_", YEAR, "/IMP_MUN_SOY_00.rds"))
 
 soy_items <- c(2555, 2571, 2590)
 
 # btd_imp (import-side bilateral trade):
 #   Stefan's btd_bal.rds covers 1986-2013; the new multi-year file covers 2010-2023.
 #   Use the version Stefan used for the years he covered (<= 2013), the new file for 2014+.
-.stefan_btd <- "data/fabio/trade/btd_bal.rds"
-.new_btd    <- "data/fabio/trade/new/btd_bal.RData"
+.stefan_btd <- file.path(DATA_DIR, "fabio/trade/btd_bal.rds")
+.new_btd    <- file.path(DATA_DIR, "fabio/trade/new/btd_bal.RData")
 if (YEAR <= 2013 && file.exists(.stefan_btd)) {
   message("[04] btd_imp: Stefan's btd_bal.rds (1986-2013) for YEAR=", YEAR)
   btd_imp <- readRDS(.stefan_btd) %>%
@@ -41,11 +45,11 @@ if (YEAR <= 2013 && file.exists(.stefan_btd)) {
   btd_imp <- readRDS(.stefan_btd) %>%
     filter(year == YEAR, item_code %in% soy_items)
 }
-btd_exp <- readRDS("data/fabio/trade/FABIO_exp/v1/btd_bal.rds") %>%
+btd_exp <- readRDS(file.path(DATA_DIR, "fabio/trade/FABIO_exp/v1/btd_bal.rds")) %>%
    filter(year == YEAR, item_code %in% soy_items)
-btd_exp_pure <- readRDS("data/fabio/trade/FABIO_exp/pure/btd_bal.rds") %>%
+btd_exp_pure <- readRDS(file.path(DATA_DIR, "fabio/trade/FABIO_exp/pure/btd_bal.rds")) %>%
    filter(year == YEAR, item_code %in% soy_items)
-cbs <- readRDS("data/fabio/trade/FABIO_exp/v1/cbs_full.rds")
+cbs <- readRDS(file.path(DATA_DIR, "fabio/trade/FABIO_exp/v1/cbs_full.rds"))
 
 # FABIO_exp data only available up to 2013 in Stefan's snapshot; warn if year-extension data not yet provided
 if (nrow(btd_exp) == 0 || nrow(btd_exp_pure) == 0) {
@@ -58,19 +62,19 @@ if (nrow(btd_exp) == 0 || nrow(btd_exp_pure) == 0) {
 # trade matrix: prefer year-specific file in data/raw/04/, fall back to Stefan's 2013 file.
 # FAOSTAT detailed trade matrices only exist here for 2013-2024; for years <= 2012
 # we intentionally use Stefan's 2013 matrix as the structural reference (his vintage).
-.tm_year <- paste0("data/raw/04/FAOSTAT_tradematrix_BRAsoy_", YEAR, ".csv")
-.tm_path <- if (file.exists(.tm_year)) .tm_year else "data/fabio/trade/FAOSTAT_tradematrix_BRAsoy.csv"
+.tm_year <- paste0(DATA_DIR, "/raw/04/FAOSTAT_tradematrix_BRAsoy_", YEAR, ".csv")
+.tm_path <- if (file.exists(.tm_year)) .tm_year else file.path(DATA_DIR, "fabio/trade/FAOSTAT_tradematrix_BRAsoy.csv")
 message("[04] trade matrix: ", .tm_path,
         if (!file.exists(.tm_year)) sprintf("  (no %d-specific file; using Stefan's 2013 fallback)", YEAR) else "")
 trade_mat <- read.csv(.tm_path, stringsAsFactors = FALSE)
 
 
 # countries contained in COMEX
-COMEX_regions <- read.csv2(file = "data/raw/04/PAIS_COMEX.csv", header = TRUE, stringsAsFactors = F, fileEncoding = "ISO-8859-1")
+COMEX_regions <- read.csv2(file = file.path(DATA_DIR, "raw/04/PAIS_COMEX.csv"), header = TRUE, stringsAsFactors = F, fileEncoding = "ISO-8859-1")
 # full sample of countries contained in FAO
-FAO_regions <- read.csv(file = "data/fabio/trade/FAO_regions_full.csv", stringsAsFactors = F)
+FAO_regions <- read.csv(file = file.path(DATA_DIR, "fabio/trade/FAO_regions_full.csv"), stringsAsFactors = F)
 # countries contained in FABIO
-FABIO_regions <- openxlsx::read.xlsx("data/fabio/trade/FABIO_regions.xlsx", colNames = TRUE)
+FABIO_regions <- openxlsx::read.xlsx(file.path(DATA_DIR, "fabio/trade/FABIO_regions.xlsx"), colNames = TRUE)
 
 
 # harmonize country sample and codes of COMEX and FAO -------------------------------------------------------
@@ -243,7 +247,7 @@ colSums(IMP_NAT_SOY[,c(5:ncol(IMP_NAT_SOY))], na.rm = TRUE)
 
 if (write){
 
-  out_dir <- paste0("data/generated/outputs/04_", YEAR)
+  out_dir <- paste0(DATA_DIR, "/generated/outputs/04_", YEAR)
   dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
   # export data

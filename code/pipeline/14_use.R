@@ -1,11 +1,15 @@
 # FABIO MRIO / land-use footprint stage (steps 13-21). Year-parameterized
 # fork of the matching archive/code_old_stefan/ script. Needs the FABIO v2 +
 # EXIOBASE backends (data/fabio/v2, data/exiobase, data/generated/fabio; see DATA.md).
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 YEAR <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(YEAR)) YEAR <- 2013
 if (!dir.exists("/mnt/nfs_fineprint") &&
-    length(list.files("data/generated/fabio")) == 0 &&
-    length(list.files("data/fabio/v2/inst")) == 0) {
+    length(list.files(file.path(DATA_DIR, "generated/fabio"))) == 0 &&
+    length(list.files(file.path(DATA_DIR, "fabio/v2/inst"))) == 0) {
   stop("[FABIO stage] FABIO/EXIOBASE data not available locally. This step needs ",
        "WU/fineprint's FABIO+EXIOBASE infrastructure (data/generated/fabio/, ",
        "archive/fabio_stefan/{inst,tidy,FABIO_hybrid}/, /mnt/nfs_fineprint/...). ",
@@ -30,11 +34,11 @@ write = TRUE
 # should feedstock optimization be calculated? (or take from stored results)
 optimize <- FALSE
 
-regions <- fread("data/fabio/v2/inst/regions_full.csv")
-items <- fread("data/fabio/v2/inst/items_full.csv")
+regions <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+items <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
 
-cbs <- readRDS(paste0("data/generated/outputs/12_", YEAR, "/cbs_full.rds"))
-sup <- readRDS("data/generated/fabio/sup.rds")
+cbs <- readRDS(paste0(DATA_DIR, "/generated/outputs/12_", YEAR, "/cbs_full.rds"))
+sup <- readRDS(file.path(DATA_DIR, "generated/fabio/sup.rds"))
 
 # v2 PORT: our step-12 cbs_full carries extra balance columns (use / dom_use / total_use)
 # that Stefan's FABIO-branch cbs did not. Step 14 builds its OWN temporary `use` column via
@@ -42,7 +46,7 @@ sup <- readRDS("data/generated/fabio/sup.rds")
 # ambiguous (use.x/use.y) and resolves to the global object. Drop the incoming one.
 if ("use" %in% names(cbs)) cbs[, use := NULL]
 
-use_items <- fread("data/fabio/v2/inst/items_use.csv")
+use_items <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_use.csv"))
 
 
 # Use ---------------------------------------------------------------------
@@ -95,7 +99,7 @@ cat("Allocating part of the TCF crops to TCF use. Applies to items:\n\t",
   paste0(unique(use[type == "TCF", item]), collapse = "; "),
   ".\n", sep = "")
 
-tcf_cbs <- fread("data/fabio/v2/inst/tcf_cbs.csv")
+tcf_cbs <- fread(file.path(DATA_DIR, "fabio/v2/inst/tcf_cbs.csv"))
 
 tcf_codes <- list(sort(unique(cbs$area_code[cbs$area_code %in% tcf_cbs$area_code])), sort(unique(tcf_cbs$item_code)),
   sort(unique(tcf_cbs$source_code)))
@@ -176,7 +180,7 @@ rm(tcf_cbs, tcf_codes, tcf_data, years, areas, out,
 
 # Ethanol production ------------------------------------------------------
 
-eth_tcf <- fread("data/fabio/v2/inst/tcf_eth.csv")
+eth_tcf <- fread(file.path(DATA_DIR, "fabio/v2/inst/tcf_eth.csv"))
 
 eth <- cbs[item_code %in% eth_tcf$item_code, ]
 eth <- merge(eth, unique(eth_tcf[, c("item_code", "tcf")]),
@@ -238,7 +242,7 @@ rm(eth)
 # Feed use ----------------------------------------------------------------
 
 # Use animal stocks
-live <- readRDS("data/fabio/v2/tidy/live_tidy.rds")
+live <- readRDS(file.path(DATA_DIR, "fabio/v2/tidy/live_tidy.rds"))
 
 # Feed supply
 feed_sup <- cbs[feed > 0 | item_code %in% c(2000),
@@ -252,7 +256,7 @@ feed_sup[, dry := feed * (1 - moisture)]
 
 # Estimates from Krausmann et al. (2008)
 # Own assumption for other camelids such as llamas and alpacas.
-conv_k <- fread("data/fabio/v2/inst/conv_krausmann.csv")
+conv_k <- fread(file.path(DATA_DIR, "fabio/v2/inst/conv_krausmann.csv"))
 
 feed_req_k <- merge(conv_k,
   live[element == "Stocks", c("area_code", "area", "item_code", "year", "value")],
@@ -265,8 +269,8 @@ feed_req_k[, `:=`(
 feed_req_k <- feed_req_k[year %in% unique(use$year), ] #### filter year
 
 # Estimates from Bouwman et al. (2013)
-conv_b <- fread("data/fabio/v2/inst/conv_bouwman.csv")
-conc_b <- fread("data/fabio/v2/inst/conc_bouwman.csv")
+conv_b <- fread(file.path(DATA_DIR, "fabio/v2/inst/conv_bouwman.csv"))
+conc_b <- fread(file.path(DATA_DIR, "fabio/v2/inst/conc_bouwman.csv"))
 
 # Add process-information
 conv_b <- merge(conv_b, conc_b,
@@ -411,8 +415,8 @@ feed[feedtype == "grass", `:=`(item_code = 2001, item = "Grazing", moisture = 0.
 feed[, feed_use := req / (1 - moisture)] #  round(req / (1 - moisture),0)
 
 ## TODO: add own estimates for municipal soy feed use to feed table
-bean_feed_mun <- readRDS("data/generated/base/bean_feed_t.rds")
-cake_feed_mun <- readRDS("data/generated/base/cake_feed_t.rds")
+bean_feed_mun <- readRDS(paste0(DATA_DIR, "/generated/outputs/03_", YEAR, "/bean_feed_t.rds"))
+cake_feed_mun <- readRDS(paste0(DATA_DIR, "/generated/outputs/03_", YEAR, "/cake_feed_t.rds"))
 
 # aggregate feed groups according to livestock husbandry processes
 names(bean_feed_mun)
@@ -497,9 +501,9 @@ rm(feed, grazing, feed_req, feed_sup, live)
 
 #Optimise feedstock allocation -----
 # Allocate feedstocks to the production of alcoholic beverages and sweeteners
-opt_tcf <- fread("data/fabio/v2/inst/tcf_optim.csv")
-opt_in <- fread("data/fabio/v2/inst/optim_in.csv")
-opt_out <- fread("data/fabio/v2/inst/optim_out.csv")
+opt_tcf <- fread(file.path(DATA_DIR, "fabio/v2/inst/tcf_optim.csv"))
+opt_in <- fread(file.path(DATA_DIR, "fabio/v2/inst/optim_in.csv"))
+opt_out <- fread(file.path(DATA_DIR, "fabio/v2/inst/optim_out.csv"))
 
 # Add processing / production information from the balances
 input <- merge(opt_in,
@@ -577,7 +581,7 @@ if (optimize) {
   
   results <- rbindlist(results)
   results[, result_in := result_in] # result_in := round(result_in)
-  if (write) saveRDS(results, paste0("./data/generated/fabio/optim_results_",Sys.Date(),".rds"))
+  if (write) saveRDS(results, paste0(DATA_DIR, "/generated/fabio/optim_results_",Sys.Date(),".rds"))
 
   } else {
   # v2 PORT: use the v2 build's pre-computed feedstock optimisation. Pick the latest
@@ -588,11 +592,11 @@ if (optimize) {
   # schema, from /mnt/nfs_fineprint/tmp/fabio/v1.1/data/) for earlier years.
   # SOYPRINT_FORCE_V11=1 forces the v1.1 path on 2010+ years (vintage cross-checks).
   .use_v11 <- YEAR < 2010 || nzchar(Sys.getenv("SOYPRINT_FORCE_V11"))
-  .opt_dir <- if (.use_v11) "data/fabio/v1.1" else "data/fabio/v2"
+  .opt_dir <- if (.use_v11) file.path(DATA_DIR, "fabio/v1.1") else file.path(DATA_DIR, "fabio/v2")
   .opt <- sort(list.files(.opt_dir, pattern = "^optim_results_.*\\.rds$",
                           full.names = TRUE), decreasing = TRUE)
   .opt_path <- if (length(.opt)) .opt[1] else
-               "data/generated/fabio/optim_results_2021-11-04.rds"
+               file.path(DATA_DIR, "generated/fabio/optim_results_2021-11-04.rds")
   cat("[14] reading feedstock optimisation from:", .opt_path, "\n")
   results <- readRDS(.opt_path)
 }
@@ -650,10 +654,10 @@ setkey(use_fd, year, area_code, comm_code)
 # Save -----
 
 if (write){
-  saveRDS(cbs, "data/generated/fabio/cbs_final.rds")
-  saveRDS(use, "data/generated/fabio/use_final.rds")
-  saveRDS(use_fd, "data/generated/fabio/use_fd_final.rds")
-  saveRDS(sup, "data/generated/fabio/sup_final.rds")
+  saveRDS(cbs, file.path(DATA_DIR, "generated/fabio/cbs_final.rds"))
+  saveRDS(use, file.path(DATA_DIR, "generated/fabio/use_final.rds"))
+  saveRDS(use_fd, file.path(DATA_DIR, "generated/fabio/use_fd_final.rds"))
+  saveRDS(sup, file.path(DATA_DIR, "generated/fabio/sup_final.rds"))
 }
 
 rm(list = ls())

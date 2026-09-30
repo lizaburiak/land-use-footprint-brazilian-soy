@@ -10,6 +10,7 @@ Usage:
     .venv/bin/python code/db/build_duckdb.py --qa-only  # QA on existing db
 """
 
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -17,12 +18,16 @@ from pathlib import Path
 
 import duckdb
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
 ROOT = Path(__file__).resolve().parents[2]
-DB = ROOT / "data/db/soyprint.duckdb"
+DB = DATA_DIR / "db/soyprint.duckdb"
 
 # SQL-escaped path literals (the repo path contains an apostrophe)
-PQ = str(ROOT / "data/db/parquet").replace("'", "''")
-FABIO_INST = str(ROOT / "data/fabio/v2/inst").replace("'", "''")
+PQ = str(DATA_DIR / "db/parquet").replace("'", "''")
+FABIO_INST = str(DATA_DIR / "fabio/v2/inst").replace("'", "''")
 
 FACTS = [
     "production", "domestic_use", "trade", "export_attribution",

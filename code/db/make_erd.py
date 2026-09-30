@@ -20,18 +20,23 @@ Usage:
        pair, no type/constraint columns and no metadata tables.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 import duckdb
 
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR.
+DATA_DIR = Path(os.environ.get("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint"))
+
 SIMPLE = "--simple" in sys.argv
 
 INPUTS_MODE = "--inputs" in sys.argv
 
 ROOT = Path(__file__).resolve().parents[2]
-DB = ROOT / "data/db/soyprint.duckdb"
+DB = DATA_DIR / "db/soyprint.duckdb"
 STEM = ("fig_db_inputs_schema" if INPUTS_MODE else
         "fig_db_schema_simple" if SIMPLE else "fig_db_schema")
 OUT_DOT = ROOT / f"paper/main/figures/{STEM}.dot"

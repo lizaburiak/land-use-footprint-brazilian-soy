@@ -9,12 +9,16 @@
 #
 # Usage : Rscript code/prep/prep_exiobase_L.R [YEAR]            # default 2020
 #         Rscript code/prep/prep_exiobase_L.R 2013
+# Data root: all inputs and generated outputs live here (moved off the repo 2026-09-17).
+# Override per run with the environment variable SOYPRINT_DATA_DIR (e.g. isolated worker dirs).
+DATA_DIR <- Sys.getenv("SOYPRINT_DATA_DIR", "/mnt/bigdata/projects/soyprint")
+
 suppressPackageStartupMessages(library(Matrix))
 
 year <- suppressWarnings(as.integer(commandArgs(trailingOnly = TRUE)[1]))
 if (is.na(year)) year <- 2020
-d <- sprintf("data/exiobase/pxp/IOT_%d_pxp", year)
-out <- "data/exiobase/pxp"
+d <- sprintf(file.path(DATA_DIR, "exiobase/pxp/IOT_%d_pxp"), year)
+out <- file.path(DATA_DIR, "exiobase/pxp")
 stopifnot(dir.exists(d))
 
 Z <- as.matrix(readRDS(file.path(d, "Z.rds")))
