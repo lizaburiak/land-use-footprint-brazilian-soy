@@ -21,6 +21,32 @@ write = TRUE
 SOY_MUN <- readRDS(paste0(OUT, "SOY_MUN_00.rds"))
 CBS_SOY <- openxlsx::read.xlsx(paste0(DATA_DIR, "/raw/00/FAO_CBS/CBS_SOY_", YEAR, "_FAO.xlsx"))
 
+# Guard: the rows and columns below are taken BY POSITION. Check that each carries the FAO
+# label it is assumed to carry, and fail loudly if a workbook ever arrives in another layout.
+.fao_elements <- c("Domestic supply quantity", "Production", "Export Quantity", "Import Quantity",
+                   "Food supply quantity (tonnes)", "Feed", "Seed", "Other uses", "Processing",
+                   "Stock Variation")
+.fao_items <- c("Soyabean Cake", "Soyabean Oil", "Soyabeans")   # columns 3:5; reordered by 5:3 below
+.got_el <- trimws(as.character(CBS_SOY[-c(1, 2, nrow(CBS_SOY)), 2]))
+.got_it <- trimws(as.character(unlist(CBS_SOY[1, 3:5])))
+if (!identical(.got_el, .fao_elements) || !identical(.got_it, .fao_items)) {
+  stop(sprintf("[00] CBS_SOY_%d_FAO.xlsx layout changed. Elements: %s | items: %s", YEAR,
+               paste(.got_el, collapse = "; "), paste(.got_it, collapse = "; ")), call. = FALSE)
+}
+
+# Log the stock-variation sign convention of this workbook, from its own domestic-supply identity
+# (domestic supply = production - export + import +/- stock variation). Values are NOT changed here:
+# the code below reads the row as a withdrawal, and step 05's closing residual absorbs a flipped sign.
+.v <- function(el, col) suppressWarnings(as.numeric(as.character(CBS_SOY[-c(1, 2, nrow(CBS_SOY)), col][match(el, .got_el)])))
+for (.k in 3:5) {
+  .v0 <- function(el) { x <- .v(el, .k); if (is.na(x)) 0 else x }
+  .base <- .v0("Production") - .v0("Export Quantity") + .v0("Import Quantity")
+  .sv <- .v0("Stock Variation"); .ds <- .v0("Domestic supply quantity")
+  .conv <- if (.sv == 0) "no stock variation" else if (abs(.base + .sv - .ds) <= abs(.base - .sv - .ds))
+    "positive = withdrawal" else "positive = addition"
+  message(sprintf("[00] %d %s: FAO Stock Variation %.0f t, sign convention: %s", YEAR, .got_it[.k - 2], .sv, .conv))
+}
+
 # format FAO CBS
 CBS_SOY <- CBS_SOY[-c(1,2, nrow(CBS_SOY)),]
 rownames(CBS_SOY) <- c("domestic_supply","production", "export", "import" , "food" , "feed", "seed", "other", "processing", "stock_withdrawal")

@@ -219,21 +219,30 @@ for (Y in YEARS) {
     "other_oil",   "oil",    "other",
     "seed_bean",   "bean",   "seed",
     "feed_bean",   "bean",   "feed",
-    "feed_cake",   "cake",   "feed",
-    "stock_bean",  "bean",   "stock",
-    "stock_oil",   "oil",    "stock",
-    "stock_cake",  "cake",   "stock")
+    "feed_cake",   "cake",   "feed")
   du_have <- du_map %>% filter(col %in% names(soy))
+  # Stock rows come from 05b_stock_decomposition.R, which splits step 05's net stock change
+  # (stock_bean/oil/cake) into FAO stock variation, losses and residual. The parts sum to
+  # the net row per municipality and product; the model itself still uses the net.
+  f_dec <- outp("05", Y, "STOCK_DECOMP_MUN.rds")
+  if (!file.exists(f_dec)) stop("[release] missing ", f_dec, " -- run code/pipeline/05b_stock_decomposition.R ", Y)
+  stock_rows <- readRDS(f_dec) %>%
+    transmute(co_mun = as.integer(co_mun), product = as.character(product),
+              use_category = c(stock = "stock", losses = "losses", residual = "residual")[as.character(component)],
+              tonnes = as.numeric(tonnes))
+  stopifnot(!anyNA(stock_rows$use_category))
   domestic_use <- soy %>%
     select(co_mun, all_of(du_have$col)) %>%
     pivot_longer(-co_mun, names_to = "col", values_to = "tonnes") %>%
     inner_join(du_have, by = "col") %>%
+    transmute(co_mun = as.integer(co_mun), product, use_category, tonnes = as.numeric(tonnes)) %>%
+    bind_rows(stock_rows) %>%
     filter(!is.na(tonnes), tonnes != 0) %>%
-    transmute(co_mun = as.integer(co_mun), product, use_category,
-              tonnes = as.numeric(tonnes), year = as.integer(Y)) %>%
+    mutate(year = as.integer(Y)) %>%
     arrange(co_mun, product, use_category)
   n$domestic_use <- write_fact(domestic_use, "domestic_use", Y)
   note_prov("domestic_use", Y, f_soy)
+  note_prov("domestic_use", Y, f_dec)
 
   # trade: exports and imports stacked; FAO partner codes resolved to iso3
   f_exp <- outp("05", Y, "EXP_MUN_SOY_cbs.rds"); f_imp <- outp("05", Y, "IMP_MUN_SOY_cbs.rds")

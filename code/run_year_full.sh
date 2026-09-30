@@ -53,6 +53,7 @@ run_step 02_livestock          code/pipeline/02_livestock_systems.R             
 run_step 03_feed               code/pipeline/03_feed_use.R                              || exit 1
 run_step 04_trade              code/pipeline/04_trade_harmonization.R                   || exit 1
 run_step 05_balancing          code/pipeline/05_balancing.R                            || exit 1
+run_step 05b_stock_decomp       code/pipeline/05b_stock_decomposition.R                 || exit 1
 run_step 07_transport_R        code/pipeline/07_transport_R.R                          || exit 1
 run_step 08_export_link_mean   code/pipeline/08_export_link_mean.R                     || exit 1
 run_step 08_export_link_sep    code/pipeline/08_export_link_sep.R                      || exit 1
