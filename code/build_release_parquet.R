@@ -81,18 +81,15 @@ write_dim <- function(df, tbl) {
 # Measured on 2013; recorded in meta_provenance so the cut is never invisible.
 FP_MIN_HA <- 0.01
 
-# FP_MIN_YEAR: the footprint series starts in 2001, matching the manuscript
-# (paper/data_section/data.tex:136 and its two copies). 2000's step-20 output exists and
-# every aggregate check on it passes, but its municipal allocation is internally
-# inconsistent: step 16 rebalances supply against use by pushing the per-row residual into
-# <region>_balancing, and for 2000 that injects ~53 Mt of GROSS +/- residual onto municipal
-# soy rows (2001: 6,539 t). The residuals net to only -0.4 Mt nationally, so national checks
-# pass, but step 20 drops `balancing` as non-consumption and each municipality's land is
-# scaled by its own broken coverage ratio. Kept final demand then drives just 19.1% of 2000's
-# municipal soy output (2001: 68.5%), and the traced footprint falls to 20.7% of harvested
-# area against 64-78% in every other year. Diagnosed 2026-09-23; the cause lies in the
-# municipal allocation in steps 13-15 and is unresolved. The other fact tables keep 2000.
-FP_MIN_YEAR <- 2001L
+# FP_MIN_YEAR: first year of the footprint tables. 2000 was excluded until 2026-09-30: its
+# traced footprint was 20.7% of harvested area (64-78% in other years), which on 2026-09-23
+# was put down to steps 13-15. The real cause was step 12 (commit 2fe3b78): SOY_MUN_fin for
+# 2000 ends with an out-of-order code (2919553), and the re-export matrix labels were taken
+# in file order while its indices were in sorted order, so 3,454 municipalities carried a
+# neighbour's flows. Re-run with the fix, 2000 traces 70.5% of harvested area with max
+# municipal coverage 1.014 and none above 1.10, the same standard as 2001-2003. Note the
+# manuscript (paper/data_section/data.tex:136) still says the series starts in 2001.
+FP_MIN_YEAR <- 2000L
 
 soy_triplets <- function(M) {
   rn   <- rownames(M)
@@ -375,10 +372,22 @@ states <- bind_rows(lapply(YEARS, function(y) {
   f <- outp("05", y, "SOY_MUN_fin.rds")
   if (!file.exists(f)) return(NULL)
   readRDS(f) %>% select(co_mun, nm_mun, co_state, nm_state)
-})) %>% mutate(co_mun = as.integer(co_mun)) %>% distinct(co_mun, .keep_all = TRUE)
+})) %>% mutate(co_mun = as.integer(co_mun)) %>%
+  # step 05 writes "0" placeholders for municipalities missing from that year's IBGE
+  # list (2919553 in 2000; 5104526, 5104542 in 2004); skip them so a later year names them
+  filter(!is.na(nm_mun), !trimws(as.character(nm_mun)) %in% c("", "0")) %>%
+  distinct(co_mun, .keep_all = TRUE)
+
+# Fallback names: every IBGE municipality table on disk, latest year first. Covers codes
+# that SOY_MUN_fin never names (e.g. municipalities created after the spine year).
+ibge <- bind_rows(lapply(rev(sort(Sys.glob(file.path(DATA_DIR, "raw/00/IBGE_municipalities/GEO_MUN_*_IBGE.csv")))),
+  function(f) read.csv(f, stringsAsFactors = FALSE, encoding = "UTF-8") %>%
+    transmute(co_mun = as.integer(co_mun), nm_ibge = as.character(nm_mun),
+              co_state_ibge = as.integer(co_state), nm_state_ibge = as.character(nm_state)))) %>%
+  distinct(co_mun, .keep_all = TRUE)
 
 dim_municipality <- caps %>%
-  transmute(co_mun = as.integer(co_mun), nm_mun_cap = as.character(nm_mun),
+  transmute(co_mun = as.integer(co_mun), nm_mun_cap = na_if(trimws(as.character(nm_mun)), "0"),
             lon = as.numeric(LONG), lat = as.numeric(LAT)) %>%
   full_join(states, by = "co_mun") %>%
   transmute(co_mun,
@@ -392,6 +401,12 @@ if (length(extra)) {
     co_mun = as.integer(extra), nm_mun = NA_character_, co_state = NA_integer_,
     nm_state = NA_character_, lon = NA_real_, lat = NA_real_))
 }
+dim_municipality <- dim_municipality %>%
+  left_join(ibge, by = "co_mun") %>%
+  mutate(nm_mun   = coalesce(nm_mun, nm_ibge),
+         co_state = coalesce(co_state, co_state_ibge),
+         nm_state = coalesce(nm_state, nm_state_ibge)) %>%
+  select(-nm_ibge, -co_state_ibge, -nm_state_ibge)
 # 9300000 is COMEX's undisclosed-origin sentinel, not a municipality; label it so no
 # one mistakes it for a place.
 dim_municipality <- dim_municipality %>%
