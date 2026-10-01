@@ -1,0 +1,78 @@
+table_name,field,unit,definition,notes
+dim_commodity,comm_code,code,FABIO commodity code; primary key of the 140-item FABIO commodity list.,Source: items.csv
+dim_commodity,item_code,code,FAOSTAT item code for the commodity.,Source: items.csv
+dim_commodity,item,text,FAOSTAT item name.,Source: items.csv
+dim_commodity,comm_group,text,FABIO commodity group the item belongs to.,Source: items.csv
+dim_commodity,group,text,Coarser FABIO grouping. NOTE: 'group' is a reserved SQL keyword and must be quoted in queries.,"Query as ""group"""
+dim_country,iso3c,code,ISO 3166-1 alpha-3 country code; primary key.,From regions.rds CO_PAIS_ISOA3
+dim_country,name,text,Canonical English country name from the countrycode package.,Not the COMEX label; several COMEX codes map to one ISO3
+dim_country,continent,text,Continent derived from iso3c via countrycode.,"NULL for 24 codes: aggregates (ROW), dissolved states (ANT/SCG/CSK/YMD), uninhabited territories"
+dim_country,region,text,"FABIO region grouping, verbatim from regions.rds. Mixed granularity (contains 'Canada', 'Japan', 'OECD Europe', 'Former USSR') -- NOT a continent.",Do not use as a continent
+dim_country,eu27,boolean,"1 if the country is an EU-27 member, else 0.",From regions.rds EU27
+dim_municipality,co_mun,code,IBGE 7-digit municipality code; primary key.,
+dim_municipality,nm_mun,text,Municipality name. 9300000 is labelled 'UNDISCLOSED (COMEX undisclosed-origin sentinel)'.,"2 rows beyond the 5,572 capitals spine; see notes"
+dim_municipality,co_state,code,IBGE 2-digit state (UF) code.,NULL where the municipality is absent from SOY_MUN
+dim_municipality,nm_state,text,"State (UF) abbreviation, e.g. MT, BA, RS.",NULL where absent from SOY_MUN
+dim_municipality,lon,degrees_east,Longitude of the municipal seat (WGS84).,"Seat points for 1504752, 4212650, 4220000, 4314548 and 5006275 are from IBGE Localidades 2022; the model's Euclidean distances for these five used earlier hand-entered seat points, 0.05-5.6 km away. Otherwise from MUN_capitals (IBGE Localidades 2010). NULL for 4300001 and 4300002 (lagoons, no seat), 4314530 and 9300000"
+dim_municipality,lat,degrees_north,Latitude of the municipal seat (WGS84).,"Seat points for 1504752, 4212650, 4220000, 4314548 and 5006275 are from IBGE Localidades 2022; the model's Euclidean distances for these five used earlier hand-entered seat points, 0.05-5.6 km away. Otherwise from MUN_capitals (IBGE Localidades 2010). NULL for 4300001 and 4300002 (lagoons, no seat), 4314530 and 9300000"
+dim_soy_product,product,text,"Soy product key: bean, oil or cake. Primary key; the release vocabulary.",Pipeline step 05 uses soybean/soy_oil/soy_cake; harmonised here
+dim_soy_product,hs4,code,"HS 4-digit tariff heading: 1201 bean, 1507 oil, 2304 cake.",
+dim_soy_product,fabio_item_code,code,"FAOSTAT/FABIO item code: 2555 bean, 2571 oil, 2590 cake.",
+dim_soy_product,description,text,Human-readable product name.,
+domestic_use,co_mun,code,IBGE municipality code where the use occurs.,FK dim_municipality
+domestic_use,product,text,"Soy product: bean, oil or cake.",FK dim_soy_product
+domestic_use,use_category,text,"Use type: food, feed, seed, other, stock, losses or residual. stock = FAO stock variation (positive = addition to stocks); losses = FAO post-harvest losses; residual = FAO balancing residual (unexplained difference between supply and use).","food_bean is 0 from 2014 -- FAOSTAT FBS methodology change, not a pipeline fault; stock/losses/residual split (2019-2022 only where FAO reports losses or residuals; otherwise the whole net is stock) written by Claude 2026-09-30 for human review"
+domestic_use,tonnes,t,"Mass used in the category, tonnes per municipality-year. Zero/NA rows are not stored.",
+domestic_use,year,year,Calendar year; hive partition key in the Parquet layer.,
+export_attribution,method,text,Routing method: currently only 'euclid' (straight-line distances); a multimodal variant is planned.,Kept so a multimodal version can add rows
+export_attribution,product,text,"Soy product: bean, oil or cake.",FK dim_soy_product
+export_attribution,co_mun,code,IBGE code of the producing municipality the export is attributed to.,FK dim_municipality
+export_attribution,dest_iso3,code,ISO3 of the destination country.,FK dim_country; BRA denotes the Manaus Free Trade Zone regime
+export_attribution,tonnes,t,"Mass attributed from that municipality to that destination, tonnes per year.",
+export_attribution,year,year,Calendar year; hive partition key.,
+footprint_animal_country,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,"FK dim_municipality; step 20 F_mass row, municipal soybean (c021) rows only"
+footprint_animal_country,consumer_iso3,code,ISO3 of the country consuming the animal product.,FK dim_country; A_prod_country carries no rest-of-world aggregates
+footprint_animal_country,item,text,"Animal product consumed (Bovine Meat, Pigmeat, Poultry Meat, Eggs, Milk - Excluding Butter, Butter, Ghee, Meat, Other, Mutton & Goat Meat).","The 4 overlapping group aggregates (dairy, meat, meat-dairy, meat-dairy-eggs) are dropped as derivable"
+footprint_animal_country,hectares,ha,"Municipal soy land embodied in that animal product consumed by that country, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
+footprint_animal_country,year,year,Calendar year; hive partition key.,
+footprint_country,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,FK dim_municipality
+footprint_country,consumer_code,code,"Consuming region: ISO3 country code, or one of FABIO's five rest-of-world regions (ROW_WA, ROW_WE, ROW_WF, ROW_WL, ROW_WM).",No FK: the ROW_* aggregates are not countries and are absent from dim_country
+footprint_country,demand,text,"Demand side: 'food' (FABIO, A quadrant) or 'nonfood' (EXIOBASE, B quadrant).",
+footprint_country,hectares,ha,"Municipal soy land embodied in that region's final demand, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
+footprint_country,year,year,Calendar year; hive partition key.,
+footprint_product,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,FK dim_municipality
+footprint_product,product_family,text,Vocabulary product_code belongs to: 'fabio' (food) or 'exiobase' (nonfood).,Needed because the two halves use different code systems
+footprint_product,product_code,code,"Final product embodying the soy land: a FABIO commodity code when product_family='fabio', an EXIOBASE product name when 'exiobase'.","No FK to dim_commodity: Figure 5 specifies one, but it cannot hold for the EXIOBASE half"
+footprint_product,hectares,ha,"Municipal soy land embodied in that product, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
+footprint_product,year,year,Calendar year; hive partition key.,
+meta_build,built_at,timestamp,ISO 8601 timestamp when the Parquet layer was exported.,
+meta_build,git_commit,text,Git commit of the repository at build time.,
+meta_build,git_branch,text,Git branch at build time.,
+meta_build,sqlite_version,text,SQLite library version that wrote the database.,Replaces duckdb_version in Figure 5
+meta_provenance,tbl,text,Table the provenance row describes.,
+meta_provenance,year,year,"Year partition described, or NULL for dimensions and unbuilt tables.",
+meta_provenance,source_file,text,"Pipeline artefact the table/year was built from, or a 'NOT BUILT' explanation.",
+meta_provenance,source_mtime,timestamp,Modification time of that source artefact.,
+meta_provenance,exported_at,timestamp,When this row was written.,
+production,co_mun,code,IBGE municipality code.,FK dim_municipality
+production,area_planted_ha,ha,"Soy area planted, hectares.",IBGE tabela 1612 via SOY_MUN_fin$area_plant
+production,area_harvested_ha,ha,"Soy area harvested, hectares.",SOY_MUN_fin$area_harv
+production,production_bean_t,t,"Soybean production, tonnes.",SOY_MUN_fin$prod_bean
+production,processed_bean_t,t,"Soybeans crushed/processed in the municipality, tonnes.",SOY_MUN_fin$proc_bean
+production,production_oil_t,t,"Soybean oil produced, tonnes.",SOY_MUN_fin$prod_oil
+production,production_cake_t,t,"Soybean cake/meal produced, tonnes.",SOY_MUN_fin$prod_cake
+production,year,year,Calendar year; hive partition key. One row per municipality-year.,
+trade,co_mun,code,IBGE municipality code of origin (export) or destination (import).,FK dim_municipality
+trade,product,text,"Soy product: bean, oil or cake.",FK dim_soy_product
+trade,flow,text,'export' or 'import'.,
+trade,partner_iso3,code,ISO3 of the trade partner country.,Resolved from COMEX/FAO numeric codes via regions.rds
+trade,hs4,code,"HS 4-digit heading: 1201, 1507 or 2304.",
+trade,tonnes,t,"Traded mass, tonnes. Zero/NA rows are not stored.",
+trade,value_usd,USD,"Traded value in current US dollars, as reported by COMEX.",Not deflated
+trade,year,year,Calendar year; hive partition key.,
+transport_flows,method,text,Routing method: currently only 'euclid' (straight-line distances); a multimodal variant is planned.,Kept so a multimodal version can add rows; see RUNBOOK
+transport_flows,product,text,"Soy product: bean, oil or cake.",FK dim_soy_product
+transport_flows,co_mun_orig,code,IBGE code of the origin municipality.,FK dim_municipality
+transport_flows,co_mun_dest,code,IBGE code of the destination municipality.,FK dim_municipality
+transport_flows,tonnes,t,"Mass moved on the origin-destination pair, tonnes per year.",
+transport_flows,year,year,Calendar year; hive partition key.,
