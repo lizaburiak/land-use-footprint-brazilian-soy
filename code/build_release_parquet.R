@@ -219,21 +219,30 @@ for (Y in YEARS) {
     "other_oil",   "oil",    "other",
     "seed_bean",   "bean",   "seed",
     "feed_bean",   "bean",   "feed",
-    "feed_cake",   "cake",   "feed",
-    "stock_bean",  "bean",   "stock",
-    "stock_oil",   "oil",    "stock",
-    "stock_cake",  "cake",   "stock")
+    "feed_cake",   "cake",   "feed")
   du_have <- du_map %>% filter(col %in% names(soy))
+  # Stock rows come from 05b_stock_decomposition.R, which splits step 05's net stock change
+  # (stock_bean/oil/cake) into FAO stock variation, losses and residual. The parts sum to
+  # the net row per municipality and product; the model itself still uses the net.
+  f_dec <- outp("05", Y, "STOCK_DECOMP_MUN.rds")
+  if (!file.exists(f_dec)) stop("[release] missing ", f_dec, " -- run code/pipeline/05b_stock_decomposition.R ", Y)
+  stock_rows <- readRDS(f_dec) %>%
+    transmute(co_mun = as.integer(co_mun), product = as.character(product),
+              use_category = c(stock = "stock", losses = "losses", residual = "residual")[as.character(component)],
+              tonnes = as.numeric(tonnes))
+  stopifnot(!anyNA(stock_rows$use_category))
   domestic_use <- soy %>%
     select(co_mun, all_of(du_have$col)) %>%
     pivot_longer(-co_mun, names_to = "col", values_to = "tonnes") %>%
     inner_join(du_have, by = "col") %>%
+    transmute(co_mun = as.integer(co_mun), product, use_category, tonnes = as.numeric(tonnes)) %>%
+    bind_rows(stock_rows) %>%
     filter(!is.na(tonnes), tonnes != 0) %>%
-    transmute(co_mun = as.integer(co_mun), product, use_category,
-              tonnes = as.numeric(tonnes), year = as.integer(Y)) %>%
+    mutate(year = as.integer(Y)) %>%
     arrange(co_mun, product, use_category)
   n$domestic_use <- write_fact(domestic_use, "domestic_use", Y)
   note_prov("domestic_use", Y, f_soy)
+  note_prov("domestic_use", Y, f_dec)
 
   # trade: exports and imports stacked; FAO partner codes resolved to iso3
   f_exp <- outp("05", Y, "EXP_MUN_SOY_cbs.rds"); f_imp <- outp("05", Y, "IMP_MUN_SOY_cbs.rds")
@@ -259,11 +268,15 @@ for (Y in YEARS) {
   n$trade <- write_fact(trade, "trade", Y)
   note_prov("trade", Y, f_exp)
 
-  # transport_flows: flows_mu carries one column per routing method
+  # transport_flows: flows_mu carries one column per routing method. Only 'euclid' ships:
+  # step 06 and the multimode LP never ran for this release, so step 08's 'mean' column
+  # is a copy of 'euclid'. The method column stays so a multimodal version can add rows.
+  SHIP_METHOD <- "euclid"
   f_flows <- outp("08", Y, "flows_mu.rds")
   if (file.exists(f_flows)) {
     fl <- readRDS(f_flows)
-    method_cols <- intersect(c("euclid", "mean", "multimode_mean"), names(fl))
+    if (!SHIP_METHOD %in% names(fl)) stop("[release] no '", SHIP_METHOD, "' column in ", f_flows)
+    method_cols <- SHIP_METHOD
     transport_flows <- fl %>%
       select(co_orig, co_dest, product, all_of(method_cols)) %>%
       pivot_longer(all_of(method_cols), names_to = "method", values_to = "tonnes") %>%
@@ -276,10 +289,12 @@ for (Y in YEARS) {
     note_prov("transport_flows", Y, f_flows)
   }
 
-  # export_attribution: a named list, one data.frame per method
+  # export_attribution: a named list, one data.frame per method; ships 'euclid' only (above)
   f_attr <- outp("08", Y, "source_to_export_mean.rds")
   if (file.exists(f_attr)) {
     sa <- readRDS(f_attr)
+    if (!SHIP_METHOD %in% names(sa)) stop("[release] no '", SHIP_METHOD, "' element in ", f_attr)
+    sa <- sa[SHIP_METHOD]
     ea <- bind_rows(lapply(names(sa), function(m) {
       d <- sa[[m]]; if (!is.data.frame(d) || !nrow(d)) return(NULL)
       data.frame(method = m,
@@ -413,8 +428,44 @@ dim_municipality <- dim_municipality %>%
   mutate(nm_mun = ifelse(co_mun == 9300000L,
                          "UNDISCLOSED (COMEX undisclosed-origin sentinel)", nm_mun)) %>%
   arrange(co_mun)
+
+# Seat coordinates fixed in the release only. Step 00 (00_data_preparation.R:1152-1164) hand-enters
+# points for seven codes absent from IBGE Localidades 2010. Five are municipal seats, and
+# their shipped points come from IBGE Localidades 2022 (point geometry, SIRGAS 2000; the
+# LAT_/LONG_LOCALIDADE attributes are float32 and coarser). The two lagoon codes are water
+# bodies with no seat, so they get NA, as 9300000 does. MUN_capitals.rds is unchanged, so
+# the model's Euclidean distances still use the old points, 0.05-5.6 km away.
+SEAT_FIX_CODES <- c(1504752L, 4212650L, 4220000L, 4314548L, 5006275L)
+SEAT_NA_CODES  <- c(4300001L, 4300002L)
+f_loc <- file.path(DATA_DIR, "raw/00/IBGE_localities/BR_Localidades_2022.gpkg")
+loc <- sf::st_read(f_loc, quiet = TRUE, query = sprintf(
+  "SELECT CD_MUN, SCT_LOCALIDADE, geom FROM BR_localidades_2022 WHERE CT_LOCALIDADE = 'Cidade' AND CD_MUN IN (%s)",
+  paste0("'", SEAT_FIX_CODES, "'", collapse = ",")))
+stopifnot(nrow(loc) == length(SEAT_FIX_CODES),
+          setequal(as.integer(loc$CD_MUN), SEAT_FIX_CODES),
+          all(loc$SCT_LOCALIDADE == "Sede Municipal"),
+          all(c(SEAT_FIX_CODES, SEAT_NA_CODES) %in% dim_municipality$co_mun))
+xy <- sf::st_coordinates(loc)
+seat <- data.frame(co_mun = as.integer(loc$CD_MUN),
+                   lon_seat = round(xy[, "X"], 6), lat_seat = round(xy[, "Y"], 6))
+dim_municipality <- dim_municipality %>%
+  left_join(seat, by = "co_mun") %>%
+  mutate(lon = ifelse(co_mun %in% SEAT_NA_CODES, NA_real_, coalesce(lon_seat, lon)),
+         lat = ifelse(co_mun %in% SEAT_NA_CODES, NA_real_, coalesce(lat_seat, lat))) %>%
+  select(-lon_seat, -lat_seat)
+
 write_dim(dim_municipality, "dim_municipality")
 note_prov("dim_municipality", NA, outp("00", spine_year, "MUN_capitals.rds"))
+note_prov("dim_municipality", NA, f_loc)
+PROV[[length(PROV) + 1L]] <- data.frame(
+  tbl = "dim_municipality", year = NA_integer_,
+  source_file = paste0(
+    "NOTE: lon/lat for 1504752, 4212650, 4220000, 4314548 and 5006275 are the IBGE Localidades 2022 ",
+    "seat points; the model's Euclidean distances for these five used earlier hand-entered seat points ",
+    "(00_data_preparation.R), within 0.05-5.6 km of the points shipped. 4300001 and 4300002 (Lagoa Mirim, ",
+    "Lagoa dos Patos) are water bodies with no seat: lon/lat NA"),
+  source_mtime = NA_character_,
+  exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
 
 # ------------------------------------------------------------------ metadata --
 cat("\nMetadata:\n")

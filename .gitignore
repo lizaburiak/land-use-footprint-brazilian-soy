@@ -11,7 +11,8 @@
 
 # Data & generated folders — too large for git, regenerated locally
 data/
-results/
+results/*
+!results/reference/
 # (results/ covers results/outputs/ 14G and results/intermediate/ too)
 # large uploaded archives
 *.zip
