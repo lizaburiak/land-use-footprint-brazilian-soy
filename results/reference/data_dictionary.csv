@@ -1,6 +1,6 @@
-# SoyPrint data dictionary -- generated 2026-09-30T16:32:33Z
+# SoyPrint data dictionary -- generated 2026-10-02T10:20:43Z
 # source database: /mnt/bigdata/projects/soyprint/generated/soyprint.sqlite
-# generator: code/build_data_dictionary.py @ d5522f1
+# generator: code/build_data_dictionary.py @ dbcfd77
 # sqlite: 3.45.1; parquet layer read with pyarrow
 # 'UNVERIFIED -- TODO' means no human-supplied value exists yet; nothing here is inferred.
 table_name,table_role,row_count,field,ordinal,data_type,nullable,key,unit,definition,parquet_check,notes
@@ -18,8 +18,8 @@ dim_municipality,dimension,5574,co_mun,0,INTEGER,yes,pk,code,IBGE 7-digit munici
 dim_municipality,dimension,5574,nm_mun,1,TEXT,yes,,text,Municipality name. 9300000 is labelled 'UNDISCLOSED (COMEX undisclosed-origin sentinel)'.,"width differs, same type family (parquet: string)","2 rows beyond the 5,572 capitals spine; see notes"
 dim_municipality,dimension,5574,co_state,2,INTEGER,yes,,code,IBGE 2-digit state (UF) code.,"width differs, same type family (parquet: int32)",NULL where the municipality is absent from SOY_MUN
 dim_municipality,dimension,5574,nm_state,3,TEXT,yes,,text,"State (UF) abbreviation, e.g. MT, BA, RS.","width differs, same type family (parquet: string)",NULL where absent from SOY_MUN
-dim_municipality,dimension,5574,lon,4,REAL,yes,,degrees_east,Longitude of the municipal seat (WGS84).,"width differs, same type family (parquet: double)",From MUN_capitals; NULL for the 2 extra codes
-dim_municipality,dimension,5574,lat,5,REAL,yes,,degrees_north,Latitude of the municipal seat (WGS84).,"width differs, same type family (parquet: double)",From MUN_capitals; NULL for the 2 extra codes
+dim_municipality,dimension,5574,lon,4,REAL,yes,,degrees_east,Longitude of the municipal seat (WGS84).,"width differs, same type family (parquet: double)","Seat points for 1504752, 4212650, 4220000, 4314548 and 5006275 are from IBGE Localidades 2022; the model's Euclidean distances for these five used earlier hand-entered seat points, 0.05-5.6 km away. Otherwise from MUN_capitals (IBGE Localidades 2010). NULL for 4300001 and 4300002 (lagoons, no seat), 4314530 and 9300000"
+dim_municipality,dimension,5574,lat,5,REAL,yes,,degrees_north,Latitude of the municipal seat (WGS84).,"width differs, same type family (parquet: double)","Seat points for 1504752, 4212650, 4220000, 4314548 and 5006275 are from IBGE Localidades 2022; the model's Euclidean distances for these five used earlier hand-entered seat points, 0.05-5.6 km away. Otherwise from MUN_capitals (IBGE Localidades 2010). NULL for 4300001 and 4300002 (lagoons, no seat), 4314530 and 9300000"
 dim_soy_product,dimension,3,product,0,TEXT,yes,pk,text,"Soy product key: bean, oil or cake. Primary key; the release vocabulary.","width differs, same type family (parquet: string)",Pipeline step 05 uses soybean/soy_oil/soy_cake; harmonised here
 dim_soy_product,dimension,3,hs4,1,INTEGER,yes,,code,"HS 4-digit tariff heading: 1201 bean, 1507 oil, 2304 cake.","width differs, same type family (parquet: int32)",
 dim_soy_product,dimension,3,fabio_item_code,2,INTEGER,yes,,code,"FAOSTAT/FABIO item code: 2555 bean, 2571 oil, 2590 cake.","width differs, same type family (parquet: int32)",
@@ -29,12 +29,12 @@ domestic_use,fact,546665,product,1,TEXT,yes,"fk,pk",text,"Soy product: bean, oil
 domestic_use,fact,546665,use_category,2,TEXT,yes,pk,text,"Use type: food, feed, seed, other, stock, losses or residual. stock = FAO stock variation (positive = addition to stocks); losses = FAO post-harvest losses; residual = FAO balancing residual (unexplained difference between supply and use).","width differs, same type family (parquet: string)","food_bean is 0 from 2014 -- FAOSTAT FBS methodology change, not a pipeline fault; stock/losses/residual split (2019-2022 only where FAO reports losses or residuals; otherwise the whole net is stock) written by Claude 2026-09-30 for human review"
 domestic_use,fact,546665,tonnes,3,REAL,yes,,t,"Mass used in the category, tonnes per municipality-year. Zero/NA rows are not stored.","width differs, same type family (parquet: double)",
 domestic_use,fact,546665,year,4,INTEGER,yes,pk,year,Calendar year; hive partition key in the Parquet layer.,"width differs, same type family (parquet: int32)",
-export_attribution,fact,2020272,method,0,TEXT,yes,pk,text,Routing method: 'euclid' (straight-line) or 'multimode_mean'.,"width differs, same type family (parquet: string)",Both methods are stored; filter on one
-export_attribution,fact,2020272,product,1,TEXT,yes,"fk,pk",text,"Soy product: bean, oil or cake.","width differs, same type family (parquet: string)",FK dim_soy_product
-export_attribution,fact,2020272,co_mun,2,INTEGER,yes,"fk,pk",code,IBGE code of the producing municipality the export is attributed to.,"width differs, same type family (parquet: int32)",FK dim_municipality
-export_attribution,fact,2020272,dest_iso3,3,TEXT,yes,"fk,pk",code,ISO3 of the destination country.,"width differs, same type family (parquet: string)",FK dim_country; BRA denotes the Manaus Free Trade Zone regime
-export_attribution,fact,2020272,tonnes,4,REAL,yes,,t,"Mass attributed from that municipality to that destination, tonnes per year.","width differs, same type family (parquet: double)",
-export_attribution,fact,2020272,year,5,INTEGER,yes,pk,year,Calendar year; hive partition key.,"width differs, same type family (parquet: int32)",
+export_attribution,fact,1010136,method,0,TEXT,yes,pk,text,Routing method: currently only 'euclid' (straight-line distances); a multimodal variant is planned.,"width differs, same type family (parquet: string)",Kept so a multimodal version can add rows
+export_attribution,fact,1010136,product,1,TEXT,yes,"fk,pk",text,"Soy product: bean, oil or cake.","width differs, same type family (parquet: string)",FK dim_soy_product
+export_attribution,fact,1010136,co_mun,2,INTEGER,yes,"fk,pk",code,IBGE code of the producing municipality the export is attributed to.,"width differs, same type family (parquet: int32)",FK dim_municipality
+export_attribution,fact,1010136,dest_iso3,3,TEXT,yes,"fk,pk",code,"ISO3 code of the destination country. BRA is not an export: it denotes domestic use in Brazil, attributed to municipalities of origin. For beans this is domestic use net of beans crushed; crushed beans are attributed through the oil and cake rows.","width differs, same type family (parquet: string)",FK dim_country; written by Claude 2026-10-02 for human review
+export_attribution,fact,1010136,tonnes,4,REAL,yes,,t,"Mass attributed from that municipality to that destination, tonnes per year.","width differs, same type family (parquet: double)","For dest_iso3 = BRA and product = bean, rows hold only the positive cells that remain after the attribution step drops negative values. Domestic bean use net of crushing is negative in many municipalities in 2005, 2006, 2009, 2012 and 2018-2022 (946 to 2,318 municipalities), so in those years these rows do not sum to Brazilian domestic bean use. Use domestic_use for that. In the other years nothing is dropped. BRA rows for oil and cake are complete in every year. Written by Claude 2026-10-02 for human review"
+export_attribution,fact,1010136,year,5,INTEGER,yes,pk,year,Calendar year; hive partition key.,"width differs, same type family (parquet: int32)",
 footprint_animal_country,fact,4513743,co_mun,0,INTEGER,yes,"fk,pk",code,IBGE code of the producing municipality whose soy land is embodied.,"width differs, same type family (parquet: int32)","FK dim_municipality; step 20 F_mass row, municipal soybean (c021) rows only"
 footprint_animal_country,fact,4513743,consumer_iso3,1,TEXT,yes,"fk,pk",code,ISO3 of the country consuming the animal product.,"width differs, same type family (parquet: string)",FK dim_country; A_prod_country carries no rest-of-world aggregates
 footprint_animal_country,fact,4513743,item,2,TEXT,yes,pk,text,"Animal product consumed (Bovine Meat, Pigmeat, Poultry Meat, Eggs, Milk - Excluding Butter, Butter, Ghee, Meat, Other, Mutton & Goat Meat).","width differs, same type family (parquet: string)","The 4 overlapping group aggregates (dairy, meat, meat-dairy, meat-dairy-eggs) are dropped as derivable"
@@ -54,11 +54,11 @@ meta_build,metadata,1,built_at,0,TEXT,yes,,timestamp,ISO 8601 timestamp when the
 meta_build,metadata,1,git_commit,1,TEXT,yes,,text,Git commit of the repository at build time.,"width differs, same type family (parquet: string)",
 meta_build,metadata,1,git_branch,2,TEXT,yes,,text,Git branch at build time.,"width differs, same type family (parquet: string)",
 meta_build,metadata,1,sqlite_version,3,TEXT,yes,,text,SQLite library version that wrote the database.,"width differs, same type family (parquet: string)",Replaces duckdb_version in Figure 5
-meta_provenance,metadata,214,tbl,0,TEXT,yes,,text,Table the provenance row describes.,"width differs, same type family (parquet: string)",
-meta_provenance,metadata,214,year,1,INTEGER,yes,,year,"Year partition described, or NULL for dimensions and unbuilt tables.","width differs, same type family (parquet: int32)",
-meta_provenance,metadata,214,source_file,2,TEXT,yes,,text,"Pipeline artefact the table/year was built from, or a 'NOT BUILT' explanation.","width differs, same type family (parquet: string)",
-meta_provenance,metadata,214,source_mtime,3,TEXT,yes,,timestamp,Modification time of that source artefact.,"width differs, same type family (parquet: string)",
-meta_provenance,metadata,214,exported_at,4,TEXT,yes,,timestamp,When this row was written.,"width differs, same type family (parquet: string)",
+meta_provenance,metadata,216,tbl,0,TEXT,yes,,text,Table the provenance row describes.,"width differs, same type family (parquet: string)",
+meta_provenance,metadata,216,year,1,INTEGER,yes,,year,"Year partition described, or NULL for dimensions and unbuilt tables.","width differs, same type family (parquet: int32)",
+meta_provenance,metadata,216,source_file,2,TEXT,yes,,text,"Pipeline artefact the table/year was built from, or a 'NOT BUILT' explanation.","width differs, same type family (parquet: string)",
+meta_provenance,metadata,216,source_mtime,3,TEXT,yes,,timestamp,Modification time of that source artefact.,"width differs, same type family (parquet: string)",
+meta_provenance,metadata,216,exported_at,4,TEXT,yes,,timestamp,When this row was written.,"width differs, same type family (parquet: string)",
 production,fact,127972,co_mun,0,INTEGER,yes,"fk,pk",code,IBGE municipality code.,"width differs, same type family (parquet: int32)",FK dim_municipality
 production,fact,127972,area_planted_ha,1,REAL,yes,,ha,"Soy area planted, hectares.","width differs, same type family (parquet: double)",IBGE tabela 1612 via SOY_MUN_fin$area_plant
 production,fact,127972,area_harvested_ha,2,REAL,yes,,ha,"Soy area harvested, hectares.","width differs, same type family (parquet: double)",SOY_MUN_fin$area_harv
@@ -75,9 +75,9 @@ trade,fact,45145,hs4,4,INTEGER,yes,pk,code,"HS 4-digit heading: 1201, 1507 or 23
 trade,fact,45145,tonnes,5,REAL,yes,,t,"Traded mass, tonnes. Zero/NA rows are not stored.","width differs, same type family (parquet: double)",
 trade,fact,45145,value_usd,6,REAL,yes,,USD,"Traded value in current US dollars, as reported by COMEX.","width differs, same type family (parquet: double)",Not deflated
 trade,fact,45145,year,7,INTEGER,yes,pk,year,Calendar year; hive partition key.,"width differs, same type family (parquet: int32)",
-transport_flows,fact,833398,method,0,TEXT,yes,pk,text,Routing method: 'euclid' (straight-line) or 'mean'.,"width differs, same type family (parquet: string)",Euclidean distances; see RUNBOOK
-transport_flows,fact,833398,product,1,TEXT,yes,"fk,pk",text,"Soy product: bean, oil or cake.","width differs, same type family (parquet: string)",FK dim_soy_product
-transport_flows,fact,833398,co_mun_orig,2,INTEGER,yes,"fk,pk",code,IBGE code of the origin municipality.,"width differs, same type family (parquet: int32)",FK dim_municipality
-transport_flows,fact,833398,co_mun_dest,3,INTEGER,yes,"fk,pk",code,IBGE code of the destination municipality.,"width differs, same type family (parquet: int32)",FK dim_municipality
-transport_flows,fact,833398,tonnes,4,REAL,yes,,t,"Mass moved on the origin-destination pair, tonnes per year.","width differs, same type family (parquet: double)",
-transport_flows,fact,833398,year,5,INTEGER,yes,pk,year,Calendar year; hive partition key.,"width differs, same type family (parquet: int32)",
+transport_flows,fact,416699,method,0,TEXT,yes,pk,text,Routing method: currently only 'euclid' (straight-line distances); a multimodal variant is planned.,"width differs, same type family (parquet: string)",Kept so a multimodal version can add rows; see RUNBOOK
+transport_flows,fact,416699,product,1,TEXT,yes,"fk,pk",text,"Soy product: bean, oil or cake.","width differs, same type family (parquet: string)",FK dim_soy_product
+transport_flows,fact,416699,co_mun_orig,2,INTEGER,yes,"fk,pk",code,IBGE code of the origin municipality.,"width differs, same type family (parquet: int32)",FK dim_municipality
+transport_flows,fact,416699,co_mun_dest,3,INTEGER,yes,"fk,pk",code,IBGE code of the destination municipality.,"width differs, same type family (parquet: int32)",FK dim_municipality
+transport_flows,fact,416699,tonnes,4,REAL,yes,,t,"Mass moved on the origin-destination pair, tonnes per year.","width differs, same type family (parquet: double)",
+transport_flows,fact,416699,year,5,INTEGER,yes,pk,year,Calendar year; hive partition key.,"width differs, same type family (parquet: int32)",

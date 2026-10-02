@@ -27,8 +27,8 @@ domestic_use,year,year,Calendar year; hive partition key in the Parquet layer.,
 export_attribution,method,text,Routing method: currently only 'euclid' (straight-line distances); a multimodal variant is planned.,Kept so a multimodal version can add rows
 export_attribution,product,text,"Soy product: bean, oil or cake.",FK dim_soy_product
 export_attribution,co_mun,code,IBGE code of the producing municipality the export is attributed to.,FK dim_municipality
-export_attribution,dest_iso3,code,ISO3 of the destination country.,FK dim_country; BRA denotes the Manaus Free Trade Zone regime
-export_attribution,tonnes,t,"Mass attributed from that municipality to that destination, tonnes per year.",
+export_attribution,dest_iso3,code,"ISO3 code of the destination country. BRA is not an export: it denotes domestic use in Brazil, attributed to municipalities of origin. For beans this is domestic use net of beans crushed; crushed beans are attributed through the oil and cake rows.",FK dim_country; written by Claude 2026-10-02 for human review
+export_attribution,tonnes,t,"Mass attributed from that municipality to that destination, tonnes per year.","For dest_iso3 = BRA and product = bean, rows hold only the positive cells that remain after the attribution step drops negative values. Domestic bean use net of crushing is negative in many municipalities in 2005, 2006, 2009, 2012 and 2018-2022 (946 to 2,318 municipalities), so in those years these rows do not sum to Brazilian domestic bean use. Use domestic_use for that. In the other years nothing is dropped. BRA rows for oil and cake are complete in every year. Written by Claude 2026-10-02 for human review"
 export_attribution,year,year,Calendar year; hive partition key.,
 footprint_animal_country,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,"FK dim_municipality; step 20 F_mass row, municipal soybean (c021) rows only"
 footprint_animal_country,consumer_iso3,code,ISO3 of the country consuming the animal product.,FK dim_country; A_prod_country carries no rest-of-world aggregates
