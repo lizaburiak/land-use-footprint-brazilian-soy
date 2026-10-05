@@ -948,6 +948,46 @@ cat("  Population:", sum(POP_MUN$population, na.rm = TRUE), "\n")
 # rename animal types to English, merge with milked cows.
 cat("  Processing livestock...\n")
 
+# GUARD (2026-10-05): the herd columns are taken by position. The 2014-2025 files once had
+# every species except cattle in the wrong column (horses under "Bubalino", no chickens at all),
+# under the usual headers. Check the header, then the national herd of each species: stop if
+# one is zero or moves by more than 30% against the previous year's file.
+.herd_species <- c("Bovino", "Bubalino", "Equino", "Suíno - total", "Suíno - matrizes de suínos",
+                   "Caprino", "Ovino", "Galináceos - total", "Galináceos - galinhas", "Codornas")
+.herd_totals <- function(y) {
+  f <- paste0(DATA_DIR, "/raw/00/IBGE_livestock/Livestock_", y, "_tabela3939_IBGE.csv")
+  if (!file.exists(f)) return(NULL)
+  hdr <- enc2utf8(gsub('"', "", strsplit(readLines(f, n = 5, encoding = "UTF-8")[5], ";")[[1]]))
+  if (!identical(hdr[-(1:3)], .herd_species))
+    stop("[step 00] herd header mismatch in ", basename(f), ": expected ",
+         paste(.herd_species, collapse = " | "), ", found ",
+         paste(hdr[-(1:3)], collapse = " | "), call. = FALSE)
+  d <- read.csv2(f, header = TRUE, skip = 4, encoding = "UTF-8", stringsAsFactors = FALSE)
+  d <- d[d[, 1] == "MU", 4:13]
+  setNames(sapply(d, function(x) sum(suppressWarnings(as.numeric(gsub("[^0-9.-]", "", x))),
+                                     na.rm = TRUE)), .herd_species)
+}
+.herd_now  <- .herd_totals(YEAR)
+.herd_prev <- .herd_totals(YEAR - 1)
+# sows ("matrizes de suínos") were not surveyed before 2013, so zero is expected there
+.herd_chk  <- if (YEAR < 2013) setdiff(.herd_species, "Suíno - matrizes de suínos") else .herd_species
+if (any(.herd_now[.herd_chk] == 0))
+  stop(sprintf("[step 00] herd guard failed for %d: national herd is zero for %s. ", YEAR,
+               paste(.herd_chk[.herd_now[.herd_chk] == 0], collapse = ", ")),
+       "The columns are probably scrambled.", call. = FALSE)
+if (!is.null(.herd_prev)) {
+  .herd_cmp <- .herd_chk[.herd_prev[.herd_chk] > 0]
+  .herd_chg <- .herd_now[.herd_cmp] / .herd_prev[.herd_cmp] - 1
+  if (any(abs(.herd_chg) > 0.30))
+    stop(sprintf("[step 00] herd guard failed for %d: change against %d above 30%% for %s. ",
+                 YEAR, YEAR - 1,
+                 paste(sprintf("%s (%+.0f%%)", .herd_cmp, 100 * .herd_chg)[abs(.herd_chg) > 0.30],
+                       collapse = ", ")),
+         "The columns are probably scrambled.", call. = FALSE)
+}
+cat(sprintf("  Herd guard: cattle %.1f M, pigs %.1f M, chickens %.1f M\n", .herd_now["Bovino"] / 1e6,
+            .herd_now["Suíno - total"] / 1e6, .herd_now["Galináceos - total"] / 1e6))
+
 LSTOCK_MUN <- LSTOCK_MUN[LSTOCK_MUN[, 1] == "MU", 2:ncol(LSTOCK_MUN)]
 colnames(LSTOCK_MUN) <- c("co_mun", "nm_mun_raw",
   "cattle", "buffalo", "horse", "pig", "pig_mother",
