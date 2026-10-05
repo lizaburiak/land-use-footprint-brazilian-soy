@@ -822,12 +822,37 @@ cat("  Imports:", round(sum(IMP_MUN_SOY$import)), "tonnes\n")
 # Clean column names, convert to numeric, filter for target year, match codes.
 cat("  Processing production...\n")
 
+# GUARD (2026-10-05): the columns are taken by position, so check the header first.
+# Expected: planted area (SIDRA v109), harvested area (v216), production (v214).
+.pam_hdr <- iconv(colnames(PROD_MUN), to = "ASCII//TRANSLIT", sub = "")
+if (ncol(PROD_MUN) != 7 || !grepl("plantada", .pam_hdr[5], ignore.case = TRUE) ||
+    !grepl("colhida", .pam_hdr[6], ignore.case = TRUE) ||
+    !grepl("produzida", .pam_hdr[7], ignore.case = TRUE)) {
+  stop("[step 00] PAM header mismatch in ", prod_info$file, ": expected planted area, ",
+       "harvested area, production in columns 5-7, found: ",
+       paste(colnames(PROD_MUN), collapse = " | "), call. = FALSE)
+}
 colnames(PROD_MUN) <- c("co_mun", "nm_mun_raw", "product", "year",
                          "area_plant", "area_harv", "prod")
 PROD_MUN <- PROD_MUN[!is.na(PROD_MUN$co_mun) & PROD_MUN$co_mun != "", ]
 PROD_MUN[, c(1, 4:7)] <- apply(PROD_MUN[, c(1, 4:7)], 2,
   function(x) as.numeric(gsub("[^0-9.-]", "", x)))
 PROD_MUN <- filter(PROD_MUN, year == prod_info$year)
+# GUARD (2026-10-05): the 2014-2022 files once carried production (t), harvested area and
+# production value (thousand reais) under these same headers, so the header check alone is
+# not enough. Stop on implausible national ratios.
+.pam_plant <- sum(PROD_MUN$area_plant, na.rm = TRUE)
+.pam_harv  <- sum(PROD_MUN$area_harv,  na.rm = TRUE)
+.pam_yield <- sum(PROD_MUN$prod, na.rm = TRUE) / .pam_harv
+cat(sprintf("  PAM guard: planted %.3f Mha, harvested %.3f Mha, yield %.2f t/ha\n",
+            .pam_plant / 1e6, .pam_harv / 1e6, .pam_yield))
+if (!is.finite(.pam_yield) || .pam_plant > 1.5 * .pam_harv || .pam_yield < 1 || .pam_yield > 5) {
+  stop(sprintf(paste0("[step 00] PAM guard failed for %d (%s): planted/harvested = %.2f ",
+                      "(max 1.5), production per harvested hectare = %.2f t/ha (allowed 1-5). ",
+                      "The columns are probably shifted."),
+               prod_info$year, basename(prod_info$file), .pam_plant / .pam_harv, .pam_yield),
+       call. = FALSE)
+}
 PROD_MUN <- PROD_MUN %>% left_join(MUN[, 1:2], by = "co_mun")
 PROD_MUN$nm_mun_raw <- gsub(" - [A-Z]{2}$", "", PROD_MUN$nm_mun_raw) %>% toupper()
 PROD_MUN <- PROD_MUN %>% dplyr::select(-nm_mun_raw)
