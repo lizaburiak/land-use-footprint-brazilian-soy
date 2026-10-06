@@ -45,6 +45,14 @@ footprint_product,product_family,text,Vocabulary product_code belongs to: 'fabio
 footprint_product,product_code,code,"Final product embodying the soy land: a FABIO commodity code when product_family='fabio', an EXIOBASE product name when 'exiobase'.","No FK to dim_commodity: Figure 5 specifies one, but it cannot hold for the EXIOBASE half Rows with product_code c081 (Soyabean Cake) are cake fed to animals outside Brazil, held at the feed point; they are not cake consumed as a final product."
 footprint_product,hectares,ha,"Municipal soy land embodied in that product, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
 footprint_product,year,year,Calendar year; hive partition key.,
+land_balance,year,year,Calendar year; primary key.,One row per year; not partitioned
+land_balance,harvested_ha,ha,"National harvested soybean area (sum of production.area_harvested_ha), the land that step 20 distributes.","Identity: harvested_ha = footprint_food_ha + footprint_nonfood_ha + stock_change_dropped_ha + balancing_dropped_ha + nonproductive_lost_ha, within 0.01% (checked in step 20)"
+land_balance,footprint_food_ha,ha,Soy land in kept final demand on the FABIO (food) side; equals the sum of footprint_country where demand = 'food' before the 0.01 ha cut.,"Unfiltered total: the footprint tables drop cells below 0.01 ha, so their sum is marginally lower. Includes soybean cake held at the feed point abroad"
+land_balance,footprint_nonfood_ha,ha,Soy land in kept final demand on the EXIOBASE (nonfood) side; equals the sum of footprint_country where demand = 'nonfood' before the 0.01 ha cut.,Unfiltered total
+land_balance,stock_change_dropped_ha,ha,"Soy land embodied in the stock-change final demand that the footprint leaves out, signed.","Positive = net additions to stocks (land harvested this year but not consumed). NEGATIVE = net withdrawal from stocks: consumption draws on earlier harvests, so the footprint of that year EXCEEDS harvested area and traced_share is above 1"
+land_balance,balancing_dropped_ha,ha,"Soy land embodied in the statistical balancing item of final demand, which the footprint leaves out.",Signed
+land_balance,nonproductive_lost_ha,ha,"Soy land removed where step 17 scales down non-productive columns (an item using 1 unit or more of the same item per unit of output, e.g. Philippines milk).",A handful of columns per year; they are listed in the pipeline's footprints/<year>_scaled_columns.csv
+land_balance,traced_share,share,(footprint_food_ha + footprint_nonfood_ha) / harvested_ha.,Above 1 in years with net stock withdrawals (negative stock_change_dropped_ha)
 meta_build,built_at,timestamp,ISO 8601 timestamp when the Parquet layer was exported.,
 meta_build,git_commit,text,Git commit of the repository at build time.,
 meta_build,git_branch,text,Git branch at build time.,

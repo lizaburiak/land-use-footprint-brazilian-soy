@@ -129,6 +129,14 @@ SCHEMA: dict[str, dict] = {
         "fk": [(["co_mun"], "dim_municipality", ["co_mun"]),
                (["consumer_iso3"], "dim_country", ["iso3c"])], "partitioned": True,
     },
+    # -- land balance (step 20 land identity, one row per year; unfiltered totals) --
+    "land_balance": {
+        "cols": [("year", "INTEGER"), ("harvested_ha", "REAL"), ("footprint_food_ha", "REAL"),
+                 ("footprint_nonfood_ha", "REAL"), ("stock_change_dropped_ha", "REAL"),
+                 ("balancing_dropped_ha", "REAL"), ("nonproductive_lost_ha", "REAL"),
+                 ("traced_share", "REAL")],
+        "pk": ["year"], "fk": [], "partitioned": False,
+    },
     "meta_build": {
         "cols": [("built_at", "TEXT"), ("git_commit", "TEXT"),
                  ("git_branch", "TEXT"), ("sqlite_version", "TEXT")],

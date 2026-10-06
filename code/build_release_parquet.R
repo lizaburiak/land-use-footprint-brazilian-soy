@@ -469,6 +469,27 @@ PROV[[length(PROV) + 1L]] <- data.frame(
 
 # ------------------------------------------------------------------ metadata --
 cat("\nMetadata:\n")
+# ----------------------------------------------------------- land_balance --
+# One row per year: where the harvested soy area goes in step 20 (mass allocation), from the
+# land-identity file step 20 writes and checks (footprints/<Y>_land_identity.csv). These are
+# the UNFILTERED totals: the footprint tables drop cells below FP_MIN_HA, so their sums are
+# lower by a few thousandths of a percent.
+land_balance <- bind_rows(lapply(START:END, function(Y) {
+  f <- file.path(DATA_DIR, "generated/footprints", sprintf("%d_land_identity.csv", Y))
+  if (!file.exists(f)) return(NULL)
+  x <- read.csv(f)
+  note_prov("land_balance", Y, f)
+  data.frame(year = as.integer(Y),
+             harvested_ha            = x$harvested_ha,
+             footprint_food_ha       = x$kept_food_ha,
+             footprint_nonfood_ha    = x$kept_nonfood_ha,
+             stock_change_dropped_ha = x$stock_addition_ha,
+             balancing_dropped_ha    = x$balancing_ha,
+             nonproductive_lost_ha   = x$nonproductive_lost_ha,
+             traced_share            = (x$kept_food_ha + x$kept_nonfood_ha) / x$harvested_ha)
+}))
+if (!is.null(land_balance) && nrow(land_balance)) write_dim(land_balance, "land_balance")
+
 git <- function(a) tryCatch(trimws(system2("git", a, stdout = TRUE, stderr = FALSE)[1]),
                             error = function(e) NA_character_)
 meta_build <- data.frame(
