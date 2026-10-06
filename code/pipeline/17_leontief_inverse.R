@@ -31,7 +31,7 @@ write = TRUE
 
 prep_solve <- function(year, Z, Y, X,
                        adj_X = FALSE, adj_A = TRUE, adj_diag = FALSE,
-                       adj_prod = TRUE, prod_cap = 0.9999) {
+                       adj_prod = FALSE, prod_cap = 0.9999) {
 
   if(adj_X) {X <- X + 1e-10}
 
@@ -47,15 +47,15 @@ prep_solve <- function(year, Z, Y, X,
   if(adj_A) {A[A < 0] <- 0}
   if(adj_diag) {diag(A)[diag(A) == 1] <- 1 - 1e-10}
 
-  # Productiveness safeguard (2026-07): a column of A with sum >= 1 is non-productive
-  # (intermediate use >= gross output), which makes I-A singular and drives (I-A)^-1
-  # into large negative entries. The FABIO base is non-productive in ~3,600 columns
-  # every year; the MRIO build normally absorbs this, but the 2020 build does not
-  # (COVID-year base: outputs collapsed, use structure did not) -> ~3,200 non-productive
-  # FABIO-country columns and 55k negative Leontief entries (the Philippines footprint
-  # went net-negative as a result). Cap each offending column's sum just below 1 by
-  # proportional down-scaling so the system is productive. Columns already productive
-  # (colSum < prod_cap) are untouched, so productive-build years (2010-2019) are a no-op.
+  # Column cap, OFF by default since 2026-10-06 (adj_prod = FALSE). It scaled every column of A
+  # whose sum was >= prod_cap down to prod_cap, on the argument that such a column is
+  # non-productive. That only holds when all rows share one unit. Here rows are head, thousand
+  # head and tonnes, so column sums above 1 are normal: 430 birds or 11 pigs per tonne of meat,
+  # 1.05 t of beans per tonne of oil plus cake. The cap hit 2,900-3,600 columns in EVERY year
+  # (not only 2020, for which it was written), broke land conservation and removed 3.9-4.8 Mha
+  # of Brazilian soy land per year from the footprint, including nearly all poultry before 2010
+  # (birds are counted in head in the v1.1 inputs). Step 20 now checks the land identity instead.
+  # Evidence: generated/diagnostics/2026-10-05_input_audit/REPORT_input_audit_2026-10-05.md.
   if(adj_prod) {
     cs <- Matrix::colSums(A)
     bad <- which(cs >= prod_cap)
