@@ -151,33 +151,60 @@ FA_value <- l*PA_value
 FB_mass  <- l*PB_mass 
 FB_value <- l*PB_value
 
-# LAND-IDENTITY GUARD (2026-10-06). Every hectare of municipal soy land must end in final demand:
+# LAND-IDENTITY GUARD (2026-10-06). Every hectare of municipal soy land must be accounted for:
 #   harvested area = kept final demand (food side + nonfood side)
-#                    + stock additions dropped + balancing dropped        (mass allocation)
-# The identity holds exactly when the Leontief system conserves flows. It failed by 3.9-4.8 Mha
-# per year while step 17 capped column sums, and nothing checked it. Stop if it is off by more
-# than 0.01% of harvested area. The parts are written next to the footprints for every year.
+#                    + stock additions dropped (signed; negative = net withdrawal)
+#                    + balancing dropped
+#                    + land lost to the non-productive columns scaled in step 17 (same-item rule)
+# (mass allocation). It failed by 3.9-4.8 Mha per year while step 17 capped all column sums, and
+# nothing checked it. Stop if it does not close within 0.01% of harvested area, if the last term
+# exceeds 0.5%, or if any soy-land multiplier or any consumer total is negative. The parts are
+# written next to the footprints for every year and feed the release table land_balance.
 .si <- match(.mun_hit, proc_names)
+.w  <- as.vector(l[.si] %*% LA_mass[.si, , drop = FALSE])       # ha of soy land per unit of final demand
+.sc <- read.csv(paste0(DATA_DIR, "/generated/footprints/", YEAR, "_scaled_columns.csv"), stringsAsFactors = FALSE)
+.sc <- .sc[.sc$allocation == "mass", , drop = FALSE]
+.lost <- 0
+if (nrow(.sc)) {
+  .Z <- readRDS(file.path(DATA_DIR, "generated/fabio/Z_mass.rds"))[[as.character(YEAR)]]
+  .zk <- .Z[, match(.sc$column, rownames(.Z)), drop = FALSE]   # Z is square; rows and columns share labels; .zk@x[.zk@x < 0] <- 0
+  .lost <- sum((1 - .sc$scale) * as.vector(.w %*% .zk))
+  rm(.Z, .zk)
+}
+.cons <- tapply(c(Matrix::colSums(FA_mass[.si, , drop = FALSE]), Matrix::colSums(FB_mass[.si, , drop = FALSE])),
+                c(sub("_food$", "", colnames(FA_mass)), sub("_nonfood$", "", colnames(FB_mass))), sum)
 .lid <- c(year = YEAR,
-          harvested_ha       = sum(as.numeric(soy_mun$area_harv), na.rm = TRUE),
-          attached_ha        = sum(l[.si] * as.vector(X)[.si]),
-          kept_food_ha       = sum(FA_mass[.si, , drop = FALSE]),
-          kept_nonfood_ha    = sum(FB_mass[.si, , drop = FALSE]),
-          stock_addition_ha  = sum(l[.si] * as.vector(LA_mass[.si, , drop = FALSE] %*% .ya_stock)),
-          balancing_ha       = sum(l[.si] * as.vector(LA_mass[.si, , drop = FALSE] %*% .ya_bal)),
-          min_soy_multiplier = min(as.vector(l[.si] %*% LA_mass[.si, , drop = FALSE])))
-.lid["residual_ha"] <- .lid["harvested_ha"] - sum(.lid[c("kept_food_ha", "kept_nonfood_ha",
-                                                         "stock_addition_ha", "balancing_ha")])
+          harvested_ha          = sum(as.numeric(soy_mun$area_harv), na.rm = TRUE),
+          attached_ha           = sum(l[.si] * as.vector(X)[.si]),
+          kept_food_ha          = sum(FA_mass[.si, , drop = FALSE]),
+          kept_nonfood_ha       = sum(FB_mass[.si, , drop = FALSE]),
+          stock_addition_ha     = sum(.w * .ya_stock),
+          balancing_ha          = sum(.w * .ya_bal),
+          nonproductive_lost_ha = .lost,
+          n_scaled_columns      = nrow(.sc),
+          min_soy_multiplier    = min(.w),
+          min_consumer_ha       = min(.cons))
+.lid["residual_ha"] <- .lid["harvested_ha"] - sum(.lid[c("kept_food_ha", "kept_nonfood_ha", "stock_addition_ha",
+                                                         "balancing_ha", "nonproductive_lost_ha")])
 write.csv(as.data.frame(t(.lid)), paste0(DATA_DIR, "/generated/footprints/", YEAR, "_land_identity.csv"),
           row.names = FALSE)
-cat(sprintf("[20] land identity %d: harvested %.0f = kept food %.0f + kept nonfood %.0f + stock additions %.0f + balancing %.0f; residual %.0f ha (%.4f%%)\n",
+cat(sprintf("[20] land identity %d: harvested %.0f = kept food %.0f + kept nonfood %.0f + stock additions %.0f + balancing %.0f + lost to %d scaled column(s) %.0f; residual %.0f ha (%.4f%%)\n",
             YEAR, .lid["harvested_ha"], .lid["kept_food_ha"], .lid["kept_nonfood_ha"],
-            .lid["stock_addition_ha"], .lid["balancing_ha"], .lid["residual_ha"],
-            100 * .lid["residual_ha"] / .lid["harvested_ha"]))
+            .lid["stock_addition_ha"], .lid["balancing_ha"], nrow(.sc), .lid["nonproductive_lost_ha"],
+            .lid["residual_ha"], 100 * .lid["residual_ha"] / .lid["harvested_ha"]))
 if (abs(.lid["residual_ha"]) > 1e-4 * .lid["harvested_ha"])
-  stop(sprintf("[20] land-identity guard failed for %d: %.0f ha of %.0f ha harvested (%.3f%%) are neither in kept final demand nor in dropped stock additions or balancing.",
+  stop(sprintf("[20] land-identity guard failed for %d: %.0f ha of %.0f ha harvested (%.3f%%) are unaccounted for.",
                YEAR, .lid["residual_ha"], .lid["harvested_ha"],
                100 * .lid["residual_ha"] / .lid["harvested_ha"]), call. = FALSE)
+if (abs(.lid["nonproductive_lost_ha"]) > 5e-3 * .lid["harvested_ha"])
+  stop(sprintf("[20] %d: the same-item rule of step 17 removes %.0f ha, more than 0.5%% of harvested area.",
+               YEAR, .lid["nonproductive_lost_ha"]), call. = FALSE)
+if (min(.w) < -1e-9)
+  stop(sprintf("[20] %d: %d negative soy-land multiplier(s), minimum %.3g ha per unit (%s). A non-productive column is not covered by the same-item rule.",
+               YEAR, sum(.w < -1e-9), min(.w), proc_names[which.min(.w)]), call. = FALSE)
+if (min(.cons) < -1)
+  stop(sprintf("[20] %d: negative soy footprint for consumer %s (%.0f ha).",
+               YEAR, names(.cons)[which.min(.cons)], min(.cons)), call. = FALSE)
 
 
 ## by consumer product: 
@@ -205,6 +232,12 @@ FA_mass_product  <-  l*PA_mass_product
 FA_value_product <- l*PA_value_product
 FB_mass_product  <-  l*PB_mass_product 
 FB_value_product <- l*PB_value_product
+
+# GUARD: no final product may carry negative soy land (see the land-identity guard above).
+.prod <- c(Matrix::colSums(FA_mass_product[.si, , drop = FALSE]), Matrix::colSums(FB_mass_product[.si, , drop = FALSE]))
+if (min(.prod) < -1)
+  stop(sprintf("[20] %d: negative soy footprint for final product %s (%.0f ha).",
+               YEAR, names(.prod)[which.min(.prod)], min(.prod)), call. = FALSE)
 
 
 # for specifically relevant consumer products by country:
