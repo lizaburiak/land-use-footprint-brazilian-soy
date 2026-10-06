@@ -1,142 +1,152 @@
-> **UPDATE 2026-09-30 ~22:40 CEST: multimode pilot (2019) DONE in scratch `generated/workers/mm2019/` (1.7 GB); nothing running.**
-> Report: `generated/diagnostics/2026-09-30_multimode_pilot/REPORT_multimode_pilot_2019.md`. Recommendation: not worth it as is (LP under-routes rail/water vs ANTT/ANTAQ; about 25 days for 23 years); pinned-euclid if forced.
-> Proposed .gitignore change (results/* + !results/reference/) is not committed. The scratch root and ~/soyprint_mm_pilot/pylib can be deleted after the decision.
-
-> **UPDATE 2026-09-30 ~18:45 CEST: stock relabel DONE.** Commit `d5522f1` is pushed (05b_stock_decomposition.R, a step-00 label guard, builder stock/losses/residual).
-> Release: `generated/soyprint.sqlite` 2,342,920,192 B, meta_build `d5522f1`, 20,352,118 rows; FK 0, quick_check ok, dictionary agrees; every table except domestic_use is identical to bc8166b.
-> The bc8166b release was moved to `generated/release_2026-09-30_bc8166b/`.
-> Report: `generated/diagnostics/2026-09-30_stock_relabel/REPORT_stock_relabel_2026-09-30.md`.
-> Coordinates come from IBGE Localidades 2010 (+7 hand-entered "Google Maps" points); no terms on disk.
-> Next (laptop): the multimode transport run, in a separate briefing.
-
-> **UPDATE 2026-09-30 ~15:15 CEST: step-18 go-ahead DONE (Phases A-F).** Report:
-> `/mnt/bigdata/projects/soyprint/generated/diagnostics/2026-09-30_step18_rerun/REPORT_step18_fix_rebuild_stocks_2026-09-30.md`.
-> - Release: `generated/soyprint.sqlite` 2,340,933,632 B, meta_build `bc8166b`, 20,332,587 rows; FK 0, quick_check ok, dictionary agrees.
->   The previous release is in `generated/release_2026-09-30/`; the replaced 2000-2009 footprints are in `generated/archive/footprints_2026-09-30/`.
-> - Commit `bc8166b` (step-18 rows by name) is pushed to the branch only; no PR; main untouched.
-> - All workers are deleted (their run logs are kept in `.../2026-09-30_step18_rerun/worker_run_logs/`). The 57 stale Trase .tex files are deleted (archived).
-> - Phase A: transport is Euclidean only (no 06/bootstrap output exists; mean/multimode_mean == euclid).
-> - Phase F: the stock series do not close. The Brazil 2019-22 "drawdowns" are mostly FAO Residuals; the 2002-04 foreign
->   "drawdowns" are step-12 trade-reconciliation residuals. The Technical Validation text was redrafted in the report.
-> Open (laptop): PR; USDA PSD/CONAB stock series; step-00 FAO read by label + Losses/Residuals; the duplicate transport method.
-
-> **UPDATE 2026-09-30 (CEST ~10:45): phases A-E of the laptop go-ahead are DONE; every Phase D check passed.**
-> Full report: `results/reference/report_2026-09-30_step12_fix_rebuild.md`. Commits `2fe3b78` (step-12 fix) and
-> `fd1bf34` (FP_MIN_YEAR 2000 + municipality names), both pushed to `origin/release/12-table-db`.
-> New release: `/mnt/bigdata/projects/soyprint/generated/soyprint.sqlite` 2,339,921,920 B, meta_build fd1bf34,
-> 20,319,757 rows, footprints 2000-2022. Old release moved to `generated/release_2026-09-23/`; replaced footprints in
-> `generated/archive/footprints_2026-09-23/`; 09-14 Trase state in `generated/archive/trase_benchmarks_2026-09-14/`.
-> Nothing running. Workers fp2000/2004/2013/2014/2017 (15.2 GB, root-owned) kept until the release is accepted.
-> Open: PR (laptop); why steps 00/05 append unsorted "0" rows; 2004 RS/MG residuals; benchmark .tex files stale (09-14).
-> The sections below are the 2026-09-29 state and are superseded where they conflict.
-
 # Resume notes — SoyPrint (Liza's extension of Stefan's model)
 
-Written 2026-09-29 17:25 CEST (handoff). Replaces the 2026-09-23 version.
-`ROOT` = `/home/sortizgu/projects/SoyPrint/land-use-footprint-brazilian-soy` (VM; 117 GB RAM, 8 threads, no root).
-`DATA` = `/mnt/bigdata/projects/soyprint` (NFS/GPFS).
-Clock: VM, containers and every log are **UTC**; report times to the user in **CEST = UTC+2**.
-The pipeline runs in Docker `my-r-env` (R 4.6.1). Run it as root with `-v DATA:DATA:ro -v <worker>:<worker> -v DATA/generated/workers/_locks:/locks -w <worker>`.
+Written 2026-10-02 ~13:50 CEST (handoff). Replaces every earlier version: the old banners are in git history (this file
+is tracked since `dbcfd77`).
+- `ROOT` = `/home/sortizgu/projects/SoyPrint/land-use-footprint-brazilian-soy` (the VM: 117 GB RAM, 8 threads, no root).
+- `DATA` = `/mnt/bigdata/projects/soyprint`.
+- **Clock:** logs are UTC; report times to the user in CEST.
+- **How the pipeline and builders run:** in Docker `my-r-env` (R 4.6.1, Python with pyarrow, SQLite 3.45.1), as root, with
+  `-v DATA:DATA[:ro] -v ROOT:ROOT -w ROOT`.
+- **git inside the container:** pass `-e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'`.
+
+## 0. IN PROGRESS 2026-10-06 (combined re-run) -- read this first
+
+Briefing "Combined re-run: PAM, herds, no step-17 cap, cake exports from COMEX; rebuild, checks, figures"
+(2026-10-06). Reports: `generated/diagnostics/2026-10-05_input_audit/REPORT_input_audit_2026-10-05.md` (why) and
+`generated/diagnostics/2026-10-06_combined_rerun/` (this run).
+
+**Decisions taken by the user (do not re-litigate):**
+
+- **Step-17 column cap removed** (`adj_prod = FALSE`) for all years. 2020 is tested first.
+- **Soybean cake balance rebuilt in step 00_FAO:** exports = COMEX heading 2304, production = 0.75 x beans processed,
+  feed = production - exports. The cake column of `raw/00/FAO_CBS/CBS_SOY_<Y>_FAO.xlsx` is no longer used.
+- **Soybean cake fed abroad stays at the feed point** (documentation only; `14_use.R` unchanged apart from a comment).
+- **IBGE data as retrieved from SIDRA on 2026-10-05**, including the 2021 revision (Tangará da Serra).
+- **2000-2013 FAOSTAT trade matrix** (one 2013 file): left as it is for this release.
+- **Step 21** for 2022 only.
+- The frozen `dbcfd77` release files stay; the new build goes to a new directory. Zenodo draft untouched.
+
+**Raw inputs replaced on 2026-10-05 (originals archived beside them):**
+
+- `raw/00/IBGE_production/Production_tabela1612_IBGE_2014..2024.csv` -> `_archive_shifted_2026-10-05/`
+- `raw/00/IBGE_livestock/Livestock_2014..2025_tabela3939_IBGE.csv` -> `_archive_scrambled_2026-10-05/`
+
+**State of the run:** see `generated/diagnostics/2026-10-06_combined_rerun/STATUS.md` (updated at every phase, with
+PIDs, container names and log paths of anything running detached).
 
 ## 1. Stopped
 
-2026-09-29: user paused after the 2004 diagnosis requested by the laptop Claude.
-**Nothing is running**: no soy containers up and no Rscript processes. The fresh 2004 worker
-finished cleanly (RUN COMPLETE, exit 0), so **no partial artefacts exist**. The release is
-untouched: no code edits, no commits, no pushes.
+**When and why:** 2026-10-02. The user paused after the Zenodo draft was filled; publishing waits on the code merge and the
+EXIOBASE team.
 
-## 2. State table
+**Nothing is running:** no soy containers, no drivers, no monitors. No partial artefacts.
 
-| Unit | State | Proof on disk (verified 2026-09-29) |
+## 2. State table (verified on disk 2026-10-02 13:45 CEST)
+
+| unit | state | proof |
 |---|---|---|
-| Release SQLite | **done, but 2004 footprints are WRONG** (see Open item 1) | `DATA/generated/soyprint.sqlite` 2,285,445,120 B, `meta_build` commit 4ed1674 |
-| Release Parquet | done, same caveat | `DATA/generated/parquet/` 176,021,748 B |
-| Code on branch | unchanged | `release/12-table-db` at `a828e2e` == origin; `git status --short code/` empty; `main` 55fcc8c |
-| **2004 diagnosis** | **done — root cause found** | `DATA/generated/diag_2004_2026-09-29/` (4.8 MB) + memory `step12-dimnames-mislabel.md` |
-| Fresh 2004 worker (steps 12-20 + validate) | done, reproduces release exactly | `DATA/generated/workers/fp2004/` 3,098,126,697 B; `run_logs/steps.tsv` all exit 0; `2004_F_mass.rds` md5 `813e6f42…` == shipped; step-12 md5 == archive |
-| Step-12 fix | **not started** (awaiting user) | `12_re-exports.R:187` unchanged |
-| 2000 + 2004 re-run with fix | **not started** | — |
-| 2013 / 2014 / 2017 re-runs (laptop's plan) | not started, laptop was holding them | this bug does NOT touch them (0 mislabelled codes) |
-| Trase benchmark tables in ROOT | stale (2026-09-14) | `ROOT/results/tables/benchmarks/<Y>/` |
+| Phase A commit (euclid-only transport, IBGE 2022 seats, `results/reference/` versioned) | done, pushed | `dbcfd77` on `origin/release/12-table-db` |
+| BRA documentation fix (dictionary sidecar + regenerated dictionary + `code/db/README.md`) | done, pushed | `4f32df9` = `origin/release/12-table-db` HEAD |
+| **Data freeze** = release built from `dbcfd77` + docs `4f32df9` | **done, accepted by laptop** | `DATA/generated/soyprint.sqlite` 2,153,979,904 B, md5 `d0d8d5514d1021c9833bd4dd2b8fbbc9`, meta_build `dbcfd77`, 18,925,285 rows; `DATA/generated/parquet/` 190 files, combined md5 `62de5161d772d5a970d6ad8cd497844a` |
+| Phase B checks (vs d5522f1) | done, all passed | `DATA/generated/rebuild_2026-10-01_dbcfd77/compare_releases.log`, `quick_check.log` |
+| Figure 10 regenerated (13/13 years × 20 optimal draws) | done | `DATA/generated/diagnostics/2026-10-01_fig10/fig_dest_weighted_v2.png`, `fig10_trase_2010_2022.csv` |
+| Phase D clean-up | done | `DATA/generated/workers/` holds only `_locks`, `_neutrality_2026-09-30`; `~/soyprint_mm_pilot` and `~/soyprint_fig10` gone; `gdistance`, `igraph` kept in `~/R/x86_64-pc-linux-gnu-library/4.6` |
+| Phase E (USDA PSD vs FAO stock path) | done | `DATA/generated/diagnostics/2026-10-01_fig10/phaseE/psd_vs_fao_2000_2022.csv` |
+| Zenodo package | done | `DATA/generated/zenodo_v1/` (6 files, `MD5SUMS.txt` verifies) |
+| **Zenodo upload to draft 23057008** | **done, NOT published** | `DATA/generated/diagnostics/2026-10-02_zenodo/verify.txt`: 6/6 size and md5 OK; `state unsubmitted`, metadata unchanged |
+| Zenodo publish | **not started; must not happen** until the user says so | — |
+| PR / merge to `main` | not started (user's call) | `main` untouched |
 
-## 3. Artifacts built this session
+## 3. Artifacts built 2026-10-01 / 02
 
-- `/mnt/bigdata/projects/soyprint/generated/diag_2004_2026-09-29/` — 4.8 MB:
-  - `fp_vs_harv.csv` 3,432,138 B — per year×municipality footprint vs harvested area (from the shipped SQLite, via `scan.py`)
-  - `btd_vs_prod_2004.csv` 387,562 B — step-12 bean outflow vs production per municipality, 2004
-  - `probe_nodes_2004.csv` 373,864 B — per municipal c021 node: X, kept/stock/balancing-driven output, coverage
-  - probe scripts `probe*.R`, `cbs.R`, `scan.py` (run them with `docker run ... my-r-env Rscript <file>`)
-- `/mnt/bigdata/projects/soyprint/generated/workers/fp2004/` — 3.1 GB — the fresh 2004 worker, with the year-less
-  `data/generated/fabio/{X,Y,Y_hybrid,Z_mass,mr_use,...}.rds`, `2004_L_mass.rds`, `2004_B_inv_mass.rds`, footprints. The files are
-  root-owned (the container ran as root). The laptop asked that **nothing be copied from it into the release**.
+| path | size |
+|---|---:|
+| `/mnt/bigdata/projects/soyprint/generated/soyprint.sqlite` (the freeze) | 2,153,979,904 B |
+| `/mnt/bigdata/projects/soyprint/generated/parquet/` | 177,063,835 B |
+| `/mnt/bigdata/projects/soyprint/generated/release_2026-10-01_d5522f1/` (archived previous release: sqlite + parquet) | 2,524,233,403 B |
+| `/mnt/bigdata/projects/soyprint/generated/rebuild_2026-10-01_dbcfd77/` (build logs, `compare_releases.py`/`.log`, `quick_check.log`) | 79,859 B |
+| `/mnt/bigdata/projects/soyprint/generated/diagnostics/2026-10-01_fig10/` (`REPORT_freeze_fig10_2026-10-01.md`, Figure 10 PNG and CSV, drivers `run_fig10*.sh`, `fig10_build.py`, C.5 and BIG_COST scripts and logs, `kept_from_scratch/`, `phaseE/`) | 9,442,334 B |
+| `/mnt/bigdata/projects/soyprint/generated/diagnostics/2026-10-02_bra_doc/` (`REPORT_bra_doc_fix_2026-10-02.md`, `bra_cells_2000_2022.*`, checksums before and after) | 28,856 B |
+| `/mnt/bigdata/projects/soyprint/generated/diagnostics/2026-10-02_zenodo/` (`REPORT_zenodo_upload_2026-10-02.md`, `make_readme.py`, `upload.sh`/`.log`, API responses, `verify.txt`; no token in any file) | 24,866 B |
+| `/mnt/bigdata/projects/soyprint/generated/zenodo_v1/soyprint.sqlite` | 2,153,979,904 B |
+| `/mnt/bigdata/projects/soyprint/generated/zenodo_v1/soyprint_parquet.zip` | 176,271,407 B |
+| `/mnt/bigdata/projects/soyprint/generated/zenodo_v1/data_dictionary.csv` | 16,803 B |
+| `/mnt/bigdata/projects/soyprint/generated/zenodo_v1/README.md` | 5,845 B |
+| `/mnt/bigdata/projects/soyprint/generated/zenodo_v1/LICENSE.txt` | 2,885 B |
+| `/mnt/bigdata/projects/soyprint/generated/zenodo_v1/MD5SUMS.txt` | 249 B |
 
 ## 4. Open items
 
-1. **SUPERSEDED 2026-09-30 — go-ahead received; fix being applied as a commit. Evidence: `/mnt/bigdata/projects/soyprint/generated/diagnostics/2026-09-29_step12_labels/`.** ROOT CAUSE (2004, very likely 2000): step 12 gives municipalities the wrong labels.** `12_re-exports.R:187` builds
-   `sparseMatrix(i=dense_rank(from_code), j=dense_rank(to_code), dimnames=list(dims, dims))`.
-   `dense_rank` is in sorted order, but `dims` is SOY_MUN rows in file order. In 2004 `SOY_MUN_fin` ends with
-   5104526 and 5104542 (name/state "0", 0 t production), which mislabels 338 codes (5104526..5300108: the rest of MT, GO, DF).
-   All 152 over-allocated municipalities carry exactly another municipality's production (13.41 Mt moved).
-   Step 16 then closes those rows with a huge negative `21_balancing`, and step 20 drops it, so coverage reaches 567.7.
-   2000: the last row is 2919553, which mislabels 3,454 codes, with 25.35 Mt of 32.73 Mt misplaced (not yet confirmed by a re-run).
-   Every other year has 0 mislabelled codes.
-   **Proposed fix (not applied):** sort `regions_soy` by `CO_BTD` before line 145, plus `stopifnot(!is.unsorted(dims))`.
-   Then run steps 12-20 for 2000 and 2004 and rebuild the release (2000 can return: `FP_MIN_YEAR`).
-   **Blocked on: user / laptop decision.**
-2. The full diagnosis reply was given in chat on 2026-09-29. The user relays it to the laptop Claude.
-   Its three answers: only 2000 and 2004 are affected; the cause is in the code (triggered by unsorted input rows);
-   re-run steps 12-20 for 2000 and 2004, then the release layer.
-3. UNVERIFIED -- TODO: why steps 00/05 append 5104526 and 5104542 (2004) and 2919553 (2000) at the end with state "0".
-   `dim_municipality` also names these three codes "0".
-4. UNVERIFIED -- TODO: whether steps 10/11 (Trase benchmarks) read step-12 output. If they do, 2000 and 2004 benchmarks are affected too.
-5. 2004 RS (8) and MG (2) municipalities sit at 1.11-1.32x harvest (about 13 kha), outside the mislabelled range. Not investigated;
-   they are the same size as the small overshoots in 2002/2003.
-6. Not compared: the 2003/2005 dropped-demand totals at matrix level. Their matrices are gone, and only a 2004 worker was authorised.
-7. Carried over: open the PR (user); send Liza the GEO_MUN_2000 data repair and `PROVENANCE_GEO_MUN_2000_repair.md` (user);
-   backups of about 19.4 GB are kept until the release is accepted. The older list missed `soyprint_backup_2026-09-18.sqlite` (386 MB)
-   and `parquet_backup_2026-09-18/` (30 MB). The v1.1/v2 comparability caveat still applies. Section 4 item 8 of the
-   2026-09-23 notes (step 02 feedlot, step 01 seed, etc.) is still unverified.
-8. `fp2004` worker (3.1 GB): keep or delete? That is the user's call.
+1. **Publish the Zenodo record 23057008.**
+   - **Blocked on (user):** the code merge and confirmation from the EXIOBASE team.
+   - **Still empty in the draft:** creators and description. Neither was asked for.
+2. **`LICENSE.txt` "TO CONFIRM" items:** exact attribution wording for every source; the IBGE, COMEX, ABIOVE, ANP and
+   GLEAM terms; the EXIOBASE terms.
+   - **Who:** the user or co-authors.
+   - **If it changes:** re-upload that file to the draft and update `MD5SUMS.txt`.
+3. **README / CITATION placeholders:** `CITATION: <to be added>` and `PAPER: <to be added>` (user). Whether the GitHub repo
+   in the README is public: UNVERIFIED -- TODO.
+4. **Paper text no longer matches the regenerated Figure 10** (user; `paper/` is not editable by Claude):
+   - `paper/overleaf/main.tex:705`: in 2018 Euclidean (0.702) no longer beats downscale (0.707).
+   - `paper/overleaf/main.tex:715-716`: multimode is now within 0.032 of Euclidean, and 2013 is no longer the worst year.
+5. **Optional:** a note on `trade.partner_iso3` BRA, 4 rows and 4 t, presumably the COMEX Manaus FTZ code. Offered, not
+   asked for.
+6. **Token hygiene (user):** revoke the token pasted in chat on 2026-10-02. Revoke or delete the one in `~/.zenodo_token`
+   after publishing.
+7. **Uncommitted:** this file (`results/reference/RESUME_NOTES.md`). Commit only if asked.
+8. **Carried over, still unverified:**
+   - why steps 00/05 append "0"-named rows (2919553 in 2000; 5104526 and 5104542 in 2004);
+   - 2004 RS/MG municipalities at 1.11-1.32× harvest;
+   - sending the GEO_MUN_2000 repair to Liza;
+   - deleting the old backups and archives, now that the freeze is accepted. That is the user's call; see `DATA/generated/`
+     `*_backup_*`, `release_2026-09-*`, `archive/`.
 
-## 5. Decisions made
+## 5. Decisions made (do not re-litigate)
 
-- 2026-09-30 (user + laptop go-ahead): run phases A-E: commit + push the step-12 fix on the branch, re-run 2000/2004/2013/2014/2017, Trase 10/11 for 2004-2022, rebuild the release. The neutrality test uses 2003 + 2008, because no 2018 step-12 output was archived. `workers/fp2004` renamed `fp2004_prefix`.
-- 2026-09-29 (resume check, user): **Hold** on the step-12 fix and the 2000/2004 re-runs until the laptop Claude or a co-author decides. State re-verified on the VM; nothing running.
-- 2026-09-29 (user, via the laptop request): diagnosis only, with no changes to the release, commits, pushes or `paper/`. A fresh
-  2004 worker was allowed and was run. The 2013/2014/2017 re-runs wait on this answer.
-- Earlier decisions still in force: release is SQLite + Parquet; 0.01 ha threshold; 2000 excluded from the footprint
-  tables until fixed; backups kept until the release is accepted; commits as `siwar149 <siwar@workmail.com>` on
-  a branch only; step-12 orphan guard stays fatal.
+- **Multimode is not in this release.** The release ships Euclidean transport only; the `method` column stays for a later
+  multimodal version.
+- **Figure 10:**
+  - It stays in the paper, regenerated from the current build.
+  - Its metric is the volume-weighted per-destination base Pearson r (`code/analysis/fig_dest_sets.py` @ `e12cca3`), not
+    `pearson_global`.
+- **Seat coordinates:** the seven hand-entered seats are fixed only in `dim_municipality`. The model and `MUN_capitals.rds`
+  are unchanged, and the gap is documented.
+- **BRA in `export_attribution`** is domestic use. Only the documentation was fixed; no rows were dropped and nothing was
+  rebuilt.
+- **Freeze:** `dbcfd77` + `4f32df9`.
+- **Zenodo:**
+  - one deposit with 6 files; the Parquet layer goes up as one zip, because of the 100-file limit;
+  - the SQLite stays uncompressed;
+  - the draft must never be published by Claude.
+- **Earlier decisions still in force:**
+  - SQLite + Parquet (no DuckDB file);
+  - 0.01 ha footprint threshold;
+  - footprints 2000-2022;
+  - commits as `siwar149` on the branch only.
 
 ## 6. Do not
 
-- Never edit `paper/`. No DuckDB. No `pip install` on the host.
-- Do not push to `main` or merge without the user; `origin` is a co-author's repo.
-- Do not copy anything from `workers/fp2004` into the release.
-- Do not make the step-12 conservation check non-halting or weaken the orphan guard.
-- Do not allocate stock withdrawals by storage capacity.
-- Do not run two years in one directory: use `code/setup_worker.sh <Y>` + `code/run_fp.sh <Y>`.
-- Do not delete the backups before the release is accepted.
-- Do not run `pragma quick_check` inline on the 2.3 GB DB (it takes 3-4 min); run it in the background.
-- The 2026-09-23 "ruled out" list for 2000 is **SUPERSEDED (see `diagnostics/2026-09-29_step12_labels/`)**: its "step 12 is exactly clean for 2000" was wrong
-  (step 12 conserves tonnes but scrambles labels).
+- Do not publish, edit the metadata of, or discard Zenodo draft 23057008.
+- Do not modify `generated/soyprint.sqlite` or `generated/parquet/`: this is the freeze. Check the md5 values above before
+  any packaging.
+- Do not write, print or log a Zenodo token.
+  - **Read it only inside commands**, from `~/.zenodo_token`:
+    `-H @<(printf 'Authorization: Bearer %s\n' "$(< ~/.zenodo_token)")`.
+  - Writing a chat-pasted token to a file is blocked by the permission classifier.
+- Do not push to `main`, merge, or open a PR without the user. `origin` is a co-author's repo.
+- Never edit `paper/`. No `pip install` into the host Python; use `--target` in a throwaway container. No DuckDB.
+- Do not run more than 3 LP workers per container on this VM: 4 workers OOM-killed in 80 GiB.
+- Do not allocate stock withdrawals by storage capacity. Do not weaken the step-12 orphan guard or the conservation checks.
+- Do not run two years in one worker directory.
 
 ## 7. Resume command
 
-Nothing is running. Confirm state (takes about 2 s):
+Nothing is running. Confirm the freeze and the draft (about 1 minute; read-only):
 ```bash
 cd /home/sortizgu/projects/SoyPrint/land-use-footprint-brazilian-soy
-git log --oneline -1; git status --short code/
-ls -l /mnt/bigdata/projects/soyprint/generated/soyprint.sqlite
-tail -3 /mnt/bigdata/projects/soyprint/generated/workers/fp2004/run_logs/steps.tsv
-sed -n 187p code/pipeline/12_re-exports.R
+git log --oneline -1; git status --short code/      # expect 4f32df9, empty
+md5sum /mnt/bigdata/projects/soyprint/generated/soyprint.sqlite   # expect d0d8d5514d1021c9833bd4dd2b8fbbc9
+(cd /mnt/bigdata/projects/soyprint/generated/zenodo_v1 && md5sum -c MD5SUMS.txt)
 ```
-Expect `a828e2e`, empty status, 2,285,445,120 B, `validate_footprints 0 ...`, and line 187 still using `dense_rank`.
-
-Then ask the user **one** thing: apply the step-12 sort fix in the working tree (no commit) and run 2000 + 2004
-workers in parallel (about 32 GB peak of 115 GB free, about 50 min)? If yes, do these in order:
-1. Edit line ~145.
-2. Delete or rename `workers/fp2004` first (setup_worker reuses the dir; its files are root-owned, so remove them with a root container).
-3. Run `setup_worker.sh` + `run_fp.sh` for 2000 and 2004.
-4. Check that coverage max is at most about 1.05 and the traced share is about 65-75%.
-5. Confirm one unaffected year (e.g. 2001) is byte-identical under the fix.
+Then ask the user which open item comes next. The usual next step is a laptop briefing on the LICENSE wording, the paper
+text, or publishing. Do not publish without an explicit instruction.
