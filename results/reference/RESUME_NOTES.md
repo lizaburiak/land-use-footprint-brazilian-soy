@@ -24,6 +24,11 @@ Briefing "Combined re-run: PAM, herds, no step-17 cap, cake exports from COMEX; 
 - **IBGE data as retrieved from SIDRA on 2026-10-05**, including the 2021 revision (Tangará da Serra).
 - **2000-2013 FAOSTAT trade matrix** (one 2013 file): left as it is for this release.
 - **Step 21** for 2022 only.
+- **Non-productive columns (2026-10-06, after the 2020 test):** step 17 applies the same-item rule only (a column
+  using 1 unit or more of its own item per unit of output is scaled to 0.9999). No general cap.
+- **Traced share above 100% is accepted** in years with net stock withdrawals; stock additions and balancing stay
+  dropped. The land identity has five terms and feeds the new release table `land_balance`.
+- **Step-12 exception** for municipal flows with Brazil as partner stays (commit `2f46e78`; logged, stops above 100 t).
 - The frozen `dbcfd77` release files stay; the new build goes to a new directory. Zenodo draft untouched.
 
 **Raw inputs replaced on 2026-10-05 (originals archived beside them):**
