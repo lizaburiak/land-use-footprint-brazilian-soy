@@ -164,12 +164,12 @@ FB_value <- l*PB_value
 .w  <- as.vector(l[.si] %*% LA_mass[.si, , drop = FALSE])       # ha of soy land per unit of final demand
 .sc <- read.csv(paste0(DATA_DIR, "/generated/footprints/", YEAR, "_scaled_columns.csv"), stringsAsFactors = FALSE)
 .sc <- .sc[.sc$allocation == "mass", , drop = FALSE]
-.lost <- 0
+.lost <- 0; .zk <- NULL
 if (nrow(.sc)) {
   .Z <- readRDS(file.path(DATA_DIR, "generated/fabio/Z_mass.rds"))[[as.character(YEAR)]]
   .zk <- .Z[, match(.sc$column, rownames(.Z)), drop = FALSE]   # Z is square; rows and columns share labels; .zk@x[.zk@x < 0] <- 0
   .lost <- sum((1 - .sc$scale) * as.vector(.w %*% .zk))
-  rm(.Z, .zk)
+  rm(.Z)
 }
 .cons <- tapply(c(Matrix::colSums(FA_mass[.si, , drop = FALSE]), Matrix::colSums(FB_mass[.si, , drop = FALSE])),
                 c(sub("_food$", "", colnames(FA_mass)), sub("_nonfood$", "", colnames(FB_mass))), sum)
@@ -206,6 +206,18 @@ if (min(.cons) < -1)
   stop(sprintf("[20] %d: negative soy footprint for consumer %s (%.0f ha).",
                YEAR, names(.cons)[which.min(.cons)], min(.cons)), call. = FALSE)
 
+# The same balance per municipality (release table land_balance). It must close for every
+# municipality: a footprint above harvested area is then fully explained by the stock
+# withdrawals of that municipality's destinations.
+source("code/shared/land_balance.R")
+.lb <- land_balance_mun(as.numeric(sub("_c021$", "", .mun_hit)), mun_lu[.mun_hit], l[.si],
+                        LA_mass[.si, , drop = FALSE],
+                        Matrix::rowSums(FA_mass[.si, , drop = FALSE]), Matrix::rowSums(FB_mass[.si, , drop = FALSE]),
+                        .ya_stock, .ya_bal, .zk, .sc$scale)
+check_land_balance_mun(.lb, YEAR)
+write.csv(.lb[.lb$harvested_ha > 0, ], paste0(DATA_DIR, "/generated/footprints/", YEAR, "_land_balance_mun.csv"),
+          row.names = FALSE)
+rm(.lb, .zk)
 
 ## by consumer product: 
 YA_product <- Diagonal(x = rowSums(YA_country))

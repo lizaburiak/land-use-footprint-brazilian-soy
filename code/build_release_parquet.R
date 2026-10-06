@@ -470,25 +470,31 @@ PROV[[length(PROV) + 1L]] <- data.frame(
 # ------------------------------------------------------------------ metadata --
 cat("\nMetadata:\n")
 # ----------------------------------------------------------- land_balance --
-# One row per year: where the harvested soy area goes in step 20 (mass allocation), from the
-# land-identity file step 20 writes and checks (footprints/<Y>_land_identity.csv). These are
-# the UNFILTERED totals: the footprint tables drop cells below FP_MIN_HA, so their sums are
-# lower by a few thousandths of a percent.
-land_balance <- bind_rows(lapply(START:END, function(Y) {
-  f <- file.path(DATA_DIR, "generated/footprints", sprintf("%d_land_identity.csv", Y))
-  if (!file.exists(f)) return(NULL)
-  x <- read.csv(f)
+# One row per municipality and year: where its harvested soy area goes in step 20 (mass
+# allocation), from the per-municipality land balance step 20 writes and checks
+# (footprints/<Y>_land_balance_mun.csv; code/shared/land_balance.R). The identity closes per row.
+# These are UNFILTERED totals: the footprint tables drop cells below FP_MIN_HA, so their sums
+# are lower by a few thousandths of a percent. The yearly totals must equal the national
+# identity of step 20 (footprints/<Y>_land_identity.csv); the build stops otherwise.
+LB_COLS <- c("harvested_ha", "footprint_food_ha", "footprint_nonfood_ha", "stock_change_dropped_ha",
+             "balancing_dropped_ha", "nonproductive_lost_ha")
+for (Y in START:END) {
+  f  <- file.path(DATA_DIR, "generated/footprints", sprintf("%d_land_balance_mun.csv", Y))
+  fn <- file.path(DATA_DIR, "generated/footprints", sprintf("%d_land_identity.csv", Y))
+  if (!file.exists(f) || !file.exists(fn)) next
+  x <- read.csv(f); nat <- read.csv(fn)
+  ref <- c(nat$harvested_ha, nat$kept_food_ha, nat$kept_nonfood_ha, nat$stock_addition_ha, nat$balancing_ha,
+           nat$nonproductive_lost_ha)
+  if (any(abs(colSums(x[, LB_COLS]) - ref) > 1e-6 * nat$harvested_ha))
+    stop("[release] land_balance ", Y, ": municipal totals differ from the national land identity")
+  land_balance <- x %>%
+    transmute(co_mun = as.integer(co_mun), harvested_ha, footprint_food_ha, footprint_nonfood_ha,
+              stock_change_dropped_ha, balancing_dropped_ha, nonproductive_lost_ha, traced_share,
+              year = as.integer(Y)) %>%
+    arrange(co_mun)
+  write_fact(land_balance, "land_balance", Y)
   note_prov("land_balance", Y, f)
-  data.frame(year = as.integer(Y),
-             harvested_ha            = x$harvested_ha,
-             footprint_food_ha       = x$kept_food_ha,
-             footprint_nonfood_ha    = x$kept_nonfood_ha,
-             stock_change_dropped_ha = x$stock_addition_ha,
-             balancing_dropped_ha    = x$balancing_ha,
-             nonproductive_lost_ha   = x$nonproductive_lost_ha,
-             traced_share            = (x$kept_food_ha + x$kept_nonfood_ha) / x$harvested_ha)
-}))
-if (!is.null(land_balance) && nrow(land_balance)) write_dim(land_balance, "land_balance")
+}
 
 git <- function(a) tryCatch(trimws(system2("git", a, stdout = TRUE, stderr = FALSE)[1]),
                             error = function(e) NA_character_)
