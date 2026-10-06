@@ -8,6 +8,8 @@
 #
 # Usage: bash code/setup_worker.sh YYYY
 #        then: cd <worker> && bash code/run_fp.sh YYYY
+#   or: FRESH=1 bash code/setup_worker.sh YYYY
+#        then: cd <worker> && bash code/run_core.sh YYYY && bash code/run_fp.sh YYYY
 set -eu
 Y="$1"
 SRC="${SOYPRINT_DATA_DIR:-/mnt/bigdata/projects/soyprint}"
@@ -22,7 +24,11 @@ rsync -a "$REPO/logs/" "$W/logs/"
 for d in exiobase fabio fabio_before_2010 geo new raw trase; do
   ln -sfn "$SRC/$d" "$W/data/$d"
 done
+# FRESH=1: do not reuse steps 00-10 from the data root; the worker runs them itself
+# (bash code/run_core.sh YYYY) and nothing in the data root is read except raw inputs.
+if [ "${FRESH:-0}" != 1 ]; then
 for s in 00 01 02 03 04 05 07 08 10; do
   [ -d "$SRC/generated/outputs/${s}_$Y" ] && ln -sfn "$SRC/generated/outputs/${s}_$Y" "$W/data/generated/outputs/${s}_$Y"
 done
+fi
 echo "fp$Y ready at $W ($(ls "$W/data/generated/outputs" | wc -l) input symlinks)"
