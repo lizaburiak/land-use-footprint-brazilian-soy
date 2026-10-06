@@ -31,7 +31,8 @@ write = TRUE
 
 prep_solve <- function(year, Z, Y, X,
                        adj_X = FALSE, adj_A = TRUE, adj_diag = FALSE,
-                       adj_prod = FALSE, prod_cap = 0.9999) {
+                       adj_prod = FALSE, prod_cap = 0.9999,
+                       adj_same = TRUE, same_cap = 0.9999, alloc = NA_character_) {
 
   if(adj_X) {X <- X + 1e-10}
 
@@ -70,6 +71,35 @@ prep_solve <- function(year, Z, Y, X,
     }
   }
 
+  # SAME-ITEM RULE (2026-10-06). A column is truly non-productive when it uses 1 unit or more
+  # of its OWN item (summed over all regions) per unit of output: both sides are then in the
+  # same unit. Example, 2020: Philippines milk, 17,000 t of output using 10.5 t of milk per
+  # tonne, which made five soy-land multipliers and the Philippines' footprint negative. Only
+  # such columns are scaled, to same_cap, by one factor for the whole column. There are a
+  # handful per year (7 in 2020) against the ~3,000 the old cap hit. Each one is logged to
+  # footprints/<Y>_scaled_columns.csv, and step 20 reports the soy land this removes.
+  if(adj_same) {
+    nmA <- if (!is.null(colnames(A))) colnames(A) else rownames(A)   # Z is square; rows and columns share labels
+    cm  <- sub(".*_", "", nmA)
+    tr  <- Matrix::summary(A)
+    sel <- cm[tr$i] == cm[tr$j]
+    ss  <- numeric(ncol(A))
+    if (any(sel)) { agg <- rowsum(tr$x[sel], tr$j[sel]); ss[as.integer(rownames(agg))] <- agg[, 1] }
+    rm(tr, sel)
+    bad <- which(ss >= 1)
+    if(length(bad) > 0) {
+      d <- rep(1, ncol(A)); d[bad] <- same_cap / ss[bad]
+      A <- A %*% Matrix::Diagonal(x = d)
+      .scaled_log[[length(.scaled_log) + 1L]] <<- data.frame(
+        year = year, allocation = alloc, column = nmA[bad],
+        area_code = sub("_.*", "", nmA[bad]), comm_code = cm[bad],
+        same_item_input_per_unit = ss[bad], scale = d[bad], output = X[bad],
+        stringsAsFactors = FALSE)
+    }
+    cat(sprintf("[17] same-item rule (%d, %s): scaled %d column(s)%s\n", year, alloc, length(bad),
+                if (length(bad)) sprintf(" (max ratio %.2f)", max(ss)) else ""))
+  }
+
   L <- .sparseDiagonal(nrow(A)) - A
   
   lu(L) # Computes LU decomposition and stores it in L
@@ -91,6 +121,7 @@ Y <- readRDS(file.path(DATA_DIR, "generated/fabio/Y.rds"))
 X <- readRDS(file.path(DATA_DIR, "generated/fabio/X.rds"))
 
 
+.scaled_log <- list()
 for(year in years){
   
   print(year)
@@ -99,13 +130,26 @@ for(year in years){
   
   L <- prep_solve(year = year, Z = Z_m[[as.character(year)]],
                   Y = Y[[as.character(year)]], X = X[, as.character(year)],
-                  adj_diag = adjust)
+                  adj_diag = adjust, alloc = "mass")
   if (write) saveRDS(L, paste0(DATA_DIR, "/generated/fabio/", year, "_L_mass.rds"))
   
   L <- prep_solve(year = year, Z = Z_v[[as.character(year)]],
                   Y = Y[[as.character(year)]], X = X[, as.character(year)],
-                  adj_diag = adjust)
+                  adj_diag = adjust, alloc = "value")
   if (write) saveRDS(L, paste0(DATA_DIR, "/generated/fabio/", year, "_L_value.rds"))
+
+  # log of the columns scaled by the same-item rule (header only when there are none)
+  sc <- if (length(.scaled_log)) do.call(rbind, .scaled_log) else data.frame(
+    year = integer(), allocation = character(), column = character(), area_code = character(),
+    comm_code = character(), same_item_input_per_unit = numeric(), scale = numeric(), output = numeric())
+  .reg <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+  .itm <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
+  .ac <- suppressWarnings(as.numeric(sc$area_code))
+  sc$region <- ifelse(!is.na(.ac) & .ac > 1000, "BR municipality", .reg$iso3c[match(.ac, .reg$code)])
+  sc$item <- .itm$item[match(sc$comm_code, .itm$comm_code)]
+  dir.create(paste0(DATA_DIR, "/generated/footprints"), recursive = TRUE, showWarnings = FALSE)
+  if (write) write.csv(sc, paste0(DATA_DIR, "/generated/footprints/", year, "_scaled_columns.csv"), row.names = FALSE)
+  .scaled_log <- list()
   
 }
 
