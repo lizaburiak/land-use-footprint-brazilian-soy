@@ -503,6 +503,25 @@ if (length(FP_BUILT)) {
       exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
   }
 }
+# Build-level notes (year NA): choices that shape every table and are not visible from file paths.
+.prov_note <- function(tbl, txt) PROV[[length(PROV) + 1L]] <<- data.frame(
+  tbl = tbl, year = NA_integer_, source_file = txt, source_mtime = NA_character_,
+  exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
+.prov_note("production", paste0("NOTE: IBGE PAM (SIDRA table 1612; planted area v109, harvested area v216, ",
+  "production v214) for 2014-2022 as retrieved from the SIDRA API on 2026-10-05, including IBGE's revision of 2021; ",
+  "2000-2013 as retrieved earlier. Earlier builds had production value in place of tonnes for 2014-2022."))
+.prov_note("domestic_use", paste0("NOTE: IBGE herds (SIDRA table 3939) for 2014-2022 re-downloaded 2026-10-05; ",
+  "earlier builds had the herd types in the wrong columns for those years, which distorted feed by species."))
+.prov_note("trade", paste0("NOTE: soybean cake balance rebuilt in step 00_FAO: exports = COMEX heading 2304 (national ",
+  "total of the municipal export files), production = 0.75 x beans processed, feed = production - exports. ",
+  "FAO food balance sheets carry no soybean cake."))
+for (.t in c("footprint_country", "footprint_product", "footprint_animal_country")) {
+  .prov_note(.t, paste0("NOTE: step 17 column cap removed (adj_prod = FALSE) from this build on. Earlier builds ",
+    "scaled Leontief columns with sums >= 1, which removed 3.9-4.8 Mha of soy land per year. Step 20 now enforces ",
+    "harvested area = kept final demand + stock additions dropped + balancing dropped, within 0.01%."))
+  .prov_note(.t, paste0("NOTE: feed point. Soybean cake fed to animals outside Brazil is attributed to the country ",
+    "where it is fed and appears as final product c081, not traced to consumers of animal products."))
+}
 meta_provenance <- bind_rows(PROV)
 write_dim(meta_provenance, "meta_provenance")
 
