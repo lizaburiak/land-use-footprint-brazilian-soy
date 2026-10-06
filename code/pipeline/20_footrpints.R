@@ -111,6 +111,9 @@ cat("[20] municipal soy land rows matched:", length(.mun_hit), "/", nrow(soy_mun
 .keep_fd <- !grepl("_(stock_addition|balancing)$", colnames(YA))
 cat("[20] FD categories: dropping", sum(!.keep_fd), "stock_addition/balancing cols,",
     "keeping", sum(.keep_fd), "\n")
+# kept for the land-identity guard below: the final demand that is dropped, by category
+.ya_stock <- Matrix::rowSums(YA[, grepl("_stock_addition$", colnames(YA)), drop = FALSE])
+.ya_bal   <- Matrix::rowSums(YA[, grepl("_balancing$", colnames(YA)), drop = FALSE])
 YA <- YA[, .keep_fd, drop = FALSE]
 colnames(YA) <- sub("_.*", "", colnames(YA))
 colnames(YA) <-  regions$iso3c[match(as.numeric(colnames(YA)), regions$code)] # change to ISO code
@@ -147,6 +150,34 @@ FA_mass  <- l*PA_mass
 FA_value <- l*PA_value
 FB_mass  <- l*PB_mass 
 FB_value <- l*PB_value
+
+# LAND-IDENTITY GUARD (2026-10-06). Every hectare of municipal soy land must end in final demand:
+#   harvested area = kept final demand (food side + nonfood side)
+#                    + stock additions dropped + balancing dropped        (mass allocation)
+# The identity holds exactly when the Leontief system conserves flows. It failed by 3.9-4.8 Mha
+# per year while step 17 capped column sums, and nothing checked it. Stop if it is off by more
+# than 0.01% of harvested area. The parts are written next to the footprints for every year.
+.si <- match(.mun_hit, proc_names)
+.lid <- c(year = YEAR,
+          harvested_ha       = sum(as.numeric(soy_mun$area_harv), na.rm = TRUE),
+          attached_ha        = sum(l[.si] * as.vector(X)[.si]),
+          kept_food_ha       = sum(FA_mass[.si, , drop = FALSE]),
+          kept_nonfood_ha    = sum(FB_mass[.si, , drop = FALSE]),
+          stock_addition_ha  = sum(l[.si] * as.vector(LA_mass[.si, , drop = FALSE] %*% .ya_stock)),
+          balancing_ha       = sum(l[.si] * as.vector(LA_mass[.si, , drop = FALSE] %*% .ya_bal)),
+          min_soy_multiplier = min(as.vector(l[.si] %*% LA_mass[.si, , drop = FALSE])))
+.lid["residual_ha"] <- .lid["harvested_ha"] - sum(.lid[c("kept_food_ha", "kept_nonfood_ha",
+                                                         "stock_addition_ha", "balancing_ha")])
+write.csv(as.data.frame(t(.lid)), paste0(DATA_DIR, "/generated/footprints/", YEAR, "_land_identity.csv"),
+          row.names = FALSE)
+cat(sprintf("[20] land identity %d: harvested %.0f = kept food %.0f + kept nonfood %.0f + stock additions %.0f + balancing %.0f; residual %.0f ha (%.4f%%)\n",
+            YEAR, .lid["harvested_ha"], .lid["kept_food_ha"], .lid["kept_nonfood_ha"],
+            .lid["stock_addition_ha"], .lid["balancing_ha"], .lid["residual_ha"],
+            100 * .lid["residual_ha"] / .lid["harvested_ha"]))
+if (abs(.lid["residual_ha"]) > 1e-4 * .lid["harvested_ha"])
+  stop(sprintf("[20] land-identity guard failed for %d: %.0f ha of %.0f ha harvested (%.3f%%) are neither in kept final demand nor in dropped stock additions or balancing.",
+               YEAR, .lid["residual_ha"], .lid["harvested_ha"],
+               100 * .lid["residual_ha"] / .lid["harvested_ha"]), call. = FALSE)
 
 
 ## by consumer product: 
