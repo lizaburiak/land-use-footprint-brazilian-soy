@@ -32,17 +32,17 @@ export_attribution,tonnes,t,"Mass attributed from that municipality to that dest
 export_attribution,year,year,Calendar year; hive partition key.,
 footprint_animal_country,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,"FK dim_municipality; step 20 F_mass row, municipal soybean (c021) rows only"
 footprint_animal_country,consumer_iso3,code,ISO3 of the country consuming the animal product.,FK dim_country; A_prod_country carries no rest-of-world aggregates
-footprint_animal_country,item,text,"Animal product consumed (Bovine Meat, Pigmeat, Poultry Meat, Eggs, Milk - Excluding Butter, Butter, Ghee, Meat, Other, Mutton & Goat Meat).","The 4 overlapping group aggregates (dairy, meat, meat-dairy, meat-dairy-eggs) are dropped as derivable"
+footprint_animal_country,item,text,"Animal product consumed (Bovine Meat, Pigmeat, Poultry Meat, Eggs, Milk - Excluding Butter, Butter, Ghee, Meat, Other, Mutton & Goat Meat).","The 4 overlapping group aggregates (dairy, meat, meat-dairy, meat-dairy-eggs) are dropped as derivable Covers soy reaching animal products through cake and soybeans fed to livestock in Brazil and soybeans fed to livestock abroad. Cake fed abroad is not in this table: it stays at the feed point (footprint_product c081; the feeding country in footprint_country)."
 footprint_animal_country,hectares,ha,"Municipal soy land embodied in that animal product consumed by that country, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
 footprint_animal_country,year,year,Calendar year; hive partition key.,
 footprint_country,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,FK dim_municipality
-footprint_country,consumer_code,code,"Consuming region: ISO3 country code, or one of FABIO's five rest-of-world regions (ROW_WA, ROW_WE, ROW_WF, ROW_WL, ROW_WM).",No FK: the ROW_* aggregates are not countries and are absent from dim_country
-footprint_country,demand,text,"Demand side: 'food' (FABIO, A quadrant) or 'nonfood' (EXIOBASE, B quadrant).",
+footprint_country,consumer_code,code,"Consuming region: ISO3 country code, or one of FABIO's five rest-of-world regions (ROW_WA, ROW_WE, ROW_WF, ROW_WL, ROW_WM).","No FK: the ROW_* aggregates are not countries and are absent from dim_country Feed point: soybean cake fed to animals outside Brazil is attributed to the country where it is fed, not to the consumers of the resulting animal products. Soybeans and soybean oil, and cake and soybeans fed to livestock in Brazil, are traced to final consumers."
+footprint_country,demand,text,"Demand side: 'food' (FABIO, A quadrant) or 'nonfood' (EXIOBASE, B quadrant).","'food' is the whole FABIO side: it includes soybean cake held at the feed point abroad (FABIO final-demand category 'unspecified'), which is animal feed, not food."
 footprint_country,hectares,ha,"Municipal soy land embodied in that region's final demand, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
 footprint_country,year,year,Calendar year; hive partition key.,
 footprint_product,co_mun,code,IBGE code of the producing municipality whose soy land is embodied.,FK dim_municipality
 footprint_product,product_family,text,Vocabulary product_code belongs to: 'fabio' (food) or 'exiobase' (nonfood).,Needed because the two halves use different code systems
-footprint_product,product_code,code,"Final product embodying the soy land: a FABIO commodity code when product_family='fabio', an EXIOBASE product name when 'exiobase'.","No FK to dim_commodity: Figure 5 specifies one, but it cannot hold for the EXIOBASE half"
+footprint_product,product_code,code,"Final product embodying the soy land: a FABIO commodity code when product_family='fabio', an EXIOBASE product name when 'exiobase'.","No FK to dim_commodity: Figure 5 specifies one, but it cannot hold for the EXIOBASE half Rows with product_code c081 (Soyabean Cake) are cake fed to animals outside Brazil, held at the feed point; they are not cake consumed as a final product."
 footprint_product,hectares,ha,"Municipal soy land embodied in that product, hectares per year.",Mass allocation (F_mass); rows below 0.01 ha dropped
 footprint_product,year,year,Calendar year; hive partition key.,
 meta_build,built_at,timestamp,ISO 8601 timestamp when the Parquet layer was exported.,
