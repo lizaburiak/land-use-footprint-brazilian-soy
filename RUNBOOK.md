@@ -46,6 +46,31 @@ The geospatial packages need system libs GDAL/GEOS/PROJ (`brew install gdal geos
   Step 12 comes out empty (FABIO export snapshot stops at 2013) — non-fatal.
 - Periodic inputs (boundaries, POF, biodiesel) use the nearest available year ≤ target.
 
+## Building the release (procedure of the `e35c056` build, October 2026)
+
+Each year was run from raw inputs in its own worker, so that nothing is shared between years:
+
+```bash
+FRESH=1 bash code/setup_worker.sh 2013          # creates <data root>/generated/workers/fp2013
+cd <data root>/generated/workers/fp2013
+bash code/run_core.sh 2013                      # steps 00-11
+bash code/run_fp.sh 2013                        # steps 12-20 and the footprint validation
+Rscript code/prep/land_balance_mun.R 2013       # the per-municipality land balance (see below)
+```
+
+Then the worker's `outputs/`, `footprints/` and benchmark tables are copied to the data root and
+the release is built with `code/build_release_parquet.R`, `code/build_release_db.py` and
+`code/build_data_dictionary.py`.
+
+**`land_balance`.** The release table `land_balance` is built from
+`footprints/<Y>_land_balance_mun.csv`. In the `e35c056` build these files were written by
+`code/prep/land_balance_mun.R <Y>`, run after step 20. Step 20 writes a file of the same name
+itself (same function, `code/shared/land_balance.R`); its numbers agree with the standalone
+script to within 1e-14 relative but are not bit-identical, because the footprint rows are summed
+in a different order. To reproduce the release's `land_balance` byte for byte, run the
+standalone script after step 20, as above. Every other release table is reproduced byte for
+byte by the steps alone (checked on 2013, 7 October 2026).
+
 ## Troubleshooting
 
 - **`cannot open file … .rds`** → an earlier step didn't finish; check that step's log in

@@ -30,6 +30,9 @@ The combined re-run of 2026-10-06 is finished. **Nothing is running.** Report:
   byte for byte except `land_balance`, which matches to 1e-14 and exactly when `code/prep/land_balance_mun.R` is run
   after step 20; files for the manuscript are in `generated/for_manuscript_2026-10-07/` (+ `.zip`); deposit files are
   staged in `generated/zenodo_staging_e35c056/` (nothing uploaded). Scratch kept: `generated/workers/verify2013_e35c056/`.
+- **`land_balance` build procedure (decided 2026-10-07: no rebuild, document it):** the release's
+  `footprints/<Y>_land_balance_mun.csv` were written by `code/prep/land_balance_mun.R <Y>` after step 20; step 20's
+  own file agrees to within 1e-14 relative. See `RUNBOOK.md`, "Building the release".
 - **Open:** probability maps exist for China and EU-27 (2022) only (step 21 ran out of its 34 GB cap); the paper
   text and figures; README, CITATION and LICENSE items of the earlier notes below.
 
