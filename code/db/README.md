@@ -43,7 +43,7 @@ All facts carry a `year` column (from the hive partition). Units: tonnes, hectar
 | `production` | mun | area_planted_ha, area_harvested_ha, production_bean_t, processed_bean_t, production_oil_t, production_cake_t | step 05 `SOY_MUN_fin` |
 | `domestic_use` | mun × product × use_category | tonnes; categories: food, feed, seed, processing, other, stock_change | step 05 `SOY_MUN_fin` (melted) |
 | `trade` | mun × product × flow × partner | partner_iso3, hs4, tonnes, value_usd; flow = export/import | step 05 `EXP/IMP_MUN_SOY_cbs` (Comex, CBS-balanced) |
-| `export_attribution` | mun × product × destination × method | tonnes; method = euclid / multimode_mean | step 08 `source_to_export_mean` — exports *attributed to producing* municipality via the transport model (vs `trade`, which records the *exporting* municipality) |
+| `export_attribution` | mun × product × destination × method | tonnes; method = euclid (a multimodal variant is planned) | step 08 `source_to_export_mean` — exports *attributed to producing* municipality via the transport model (vs `trade`, which records the *exporting* municipality). dest BRA is not an export: it is domestic use in Brazil (see the data dictionary) |
 | `transport_flows` | mun_orig × mun_dest × product × method | tonnes | step 08 `flows_mu` |
 | `footprint_country` | mun × consumer country × demand | hectares; demand = food (FABIO) / nonfood (EXIOBASE) | step 20 `F_mass` A/B_country, soy rows (`co_mun`, c021) |
 | `footprint_product` | mun × consumer product | hectares; product_family = fabio (comm_code) / exiobase (sector name) | step 20 `F_mass` A/B_product |

@@ -97,12 +97,23 @@ hybridise <- function(year, Sup, Use, Cou, Y_all) {
   nprod <- length(unique(comms))# nrow(Oth) / 189 # 192
   
   # Create matrix for sector matching
+  # Select the Sup/Use rows BY COMMODITY CODE. They used to be taken as Sup[1:nprod, ] and
+  # labelled with unique(comms) by position. That is only right when Y's commodities are
+  # exactly the first nprod rows of fabio-exio_sup.csv in the same order: true for FABIO v2
+  # (2010+; 122 commodities, only the last row c123 absent), false for the v1.1 path
+  # (2000-2009; 119 commodities, c001, c022 and c066 absent), where every row shifted by
+  # 1-3 commodities (soybeans took the EXIOBASE use pattern of nuts, soy oil that of
+  # non-centrifugal sugar, soy cake that of ricebran oil).
+  ucomms <- unique(comms)
+  .miss <- setdiff(ucomms, intersect(rownames(Sup), rownames(Use)))
+  if (length(.miss)) stop("[18] commodities in Y missing from the FABIO-EXIOBASE Sup/Use tables: ",
+                          paste(.miss, collapse = ", "), call. = FALSE)
   T <- vector("list", 49)
   for(i in 1:49) {
-    T[[i]] <- Sup[1:nprod,] %*% Tec[[i]] * Use[1:nprod,]
+    T[[i]] <- Sup[ucomms, , drop = FALSE] %*% Tec[[i]] * Use[ucomms, , drop = FALSE]
     T[[i]] <- T[[i]] / rowSums(T[[i]])
     T[[i]][is.na(T[[i]])] <- 0
-    rownames(T[[i]]) <- unique(comms)
+    stopifnot(identical(rownames(T[[i]]), ucomms))
   }
   
   # Compute the hybrid part from Oth and T

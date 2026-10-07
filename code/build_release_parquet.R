@@ -219,21 +219,30 @@ for (Y in YEARS) {
     "other_oil",   "oil",    "other",
     "seed_bean",   "bean",   "seed",
     "feed_bean",   "bean",   "feed",
-    "feed_cake",   "cake",   "feed",
-    "stock_bean",  "bean",   "stock",
-    "stock_oil",   "oil",    "stock",
-    "stock_cake",  "cake",   "stock")
+    "feed_cake",   "cake",   "feed")
   du_have <- du_map %>% filter(col %in% names(soy))
+  # Stock rows come from 05b_stock_decomposition.R, which splits step 05's net stock change
+  # (stock_bean/oil/cake) into FAO stock variation, losses and residual. The parts sum to
+  # the net row per municipality and product; the model itself still uses the net.
+  f_dec <- outp("05", Y, "STOCK_DECOMP_MUN.rds")
+  if (!file.exists(f_dec)) stop("[release] missing ", f_dec, " -- run code/pipeline/05b_stock_decomposition.R ", Y)
+  stock_rows <- readRDS(f_dec) %>%
+    transmute(co_mun = as.integer(co_mun), product = as.character(product),
+              use_category = c(stock = "stock", losses = "losses", residual = "residual")[as.character(component)],
+              tonnes = as.numeric(tonnes))
+  stopifnot(!anyNA(stock_rows$use_category))
   domestic_use <- soy %>%
     select(co_mun, all_of(du_have$col)) %>%
     pivot_longer(-co_mun, names_to = "col", values_to = "tonnes") %>%
     inner_join(du_have, by = "col") %>%
+    transmute(co_mun = as.integer(co_mun), product, use_category, tonnes = as.numeric(tonnes)) %>%
+    bind_rows(stock_rows) %>%
     filter(!is.na(tonnes), tonnes != 0) %>%
-    transmute(co_mun = as.integer(co_mun), product, use_category,
-              tonnes = as.numeric(tonnes), year = as.integer(Y)) %>%
+    mutate(year = as.integer(Y)) %>%
     arrange(co_mun, product, use_category)
   n$domestic_use <- write_fact(domestic_use, "domestic_use", Y)
   note_prov("domestic_use", Y, f_soy)
+  note_prov("domestic_use", Y, f_dec)
 
   # trade: exports and imports stacked; FAO partner codes resolved to iso3
   f_exp <- outp("05", Y, "EXP_MUN_SOY_cbs.rds"); f_imp <- outp("05", Y, "IMP_MUN_SOY_cbs.rds")
@@ -259,11 +268,15 @@ for (Y in YEARS) {
   n$trade <- write_fact(trade, "trade", Y)
   note_prov("trade", Y, f_exp)
 
-  # transport_flows: flows_mu carries one column per routing method
+  # transport_flows: flows_mu carries one column per routing method. Only 'euclid' ships:
+  # step 06 and the multimode LP never ran for this release, so step 08's 'mean' column
+  # is a copy of 'euclid'. The method column stays so a multimodal version can add rows.
+  SHIP_METHOD <- "euclid"
   f_flows <- outp("08", Y, "flows_mu.rds")
   if (file.exists(f_flows)) {
     fl <- readRDS(f_flows)
-    method_cols <- intersect(c("euclid", "mean", "multimode_mean"), names(fl))
+    if (!SHIP_METHOD %in% names(fl)) stop("[release] no '", SHIP_METHOD, "' column in ", f_flows)
+    method_cols <- SHIP_METHOD
     transport_flows <- fl %>%
       select(co_orig, co_dest, product, all_of(method_cols)) %>%
       pivot_longer(all_of(method_cols), names_to = "method", values_to = "tonnes") %>%
@@ -276,10 +289,12 @@ for (Y in YEARS) {
     note_prov("transport_flows", Y, f_flows)
   }
 
-  # export_attribution: a named list, one data.frame per method
+  # export_attribution: a named list, one data.frame per method; ships 'euclid' only (above)
   f_attr <- outp("08", Y, "source_to_export_mean.rds")
   if (file.exists(f_attr)) {
     sa <- readRDS(f_attr)
+    if (!SHIP_METHOD %in% names(sa)) stop("[release] no '", SHIP_METHOD, "' element in ", f_attr)
+    sa <- sa[SHIP_METHOD]
     ea <- bind_rows(lapply(names(sa), function(m) {
       d <- sa[[m]]; if (!is.data.frame(d) || !nrow(d)) return(NULL)
       data.frame(method = m,
@@ -413,11 +428,74 @@ dim_municipality <- dim_municipality %>%
   mutate(nm_mun = ifelse(co_mun == 9300000L,
                          "UNDISCLOSED (COMEX undisclosed-origin sentinel)", nm_mun)) %>%
   arrange(co_mun)
+
+# Seat coordinates fixed in the release only. Step 00 (00_data_preparation.R:1152-1164) hand-enters
+# points for seven codes absent from IBGE Localidades 2010. Five are municipal seats, and
+# their shipped points come from IBGE Localidades 2022 (point geometry, SIRGAS 2000; the
+# LAT_/LONG_LOCALIDADE attributes are float32 and coarser). The two lagoon codes are water
+# bodies with no seat, so they get NA, as 9300000 does. MUN_capitals.rds is unchanged, so
+# the model's Euclidean distances still use the old points, 0.05-5.6 km away.
+SEAT_FIX_CODES <- c(1504752L, 4212650L, 4220000L, 4314548L, 5006275L)
+SEAT_NA_CODES  <- c(4300001L, 4300002L)
+f_loc <- file.path(DATA_DIR, "raw/00/IBGE_localities/BR_Localidades_2022.gpkg")
+loc <- sf::st_read(f_loc, quiet = TRUE, query = sprintf(
+  "SELECT CD_MUN, SCT_LOCALIDADE, geom FROM BR_localidades_2022 WHERE CT_LOCALIDADE = 'Cidade' AND CD_MUN IN (%s)",
+  paste0("'", SEAT_FIX_CODES, "'", collapse = ",")))
+stopifnot(nrow(loc) == length(SEAT_FIX_CODES),
+          setequal(as.integer(loc$CD_MUN), SEAT_FIX_CODES),
+          all(loc$SCT_LOCALIDADE == "Sede Municipal"),
+          all(c(SEAT_FIX_CODES, SEAT_NA_CODES) %in% dim_municipality$co_mun))
+xy <- sf::st_coordinates(loc)
+seat <- data.frame(co_mun = as.integer(loc$CD_MUN),
+                   lon_seat = round(xy[, "X"], 6), lat_seat = round(xy[, "Y"], 6))
+dim_municipality <- dim_municipality %>%
+  left_join(seat, by = "co_mun") %>%
+  mutate(lon = ifelse(co_mun %in% SEAT_NA_CODES, NA_real_, coalesce(lon_seat, lon)),
+         lat = ifelse(co_mun %in% SEAT_NA_CODES, NA_real_, coalesce(lat_seat, lat))) %>%
+  select(-lon_seat, -lat_seat)
+
 write_dim(dim_municipality, "dim_municipality")
 note_prov("dim_municipality", NA, outp("00", spine_year, "MUN_capitals.rds"))
+note_prov("dim_municipality", NA, f_loc)
+PROV[[length(PROV) + 1L]] <- data.frame(
+  tbl = "dim_municipality", year = NA_integer_,
+  source_file = paste0(
+    "NOTE: lon/lat for 1504752, 4212650, 4220000, 4314548 and 5006275 are the IBGE Localidades 2022 ",
+    "seat points; the model's Euclidean distances for these five used earlier hand-entered seat points ",
+    "(00_data_preparation.R), within 0.05-5.6 km of the points shipped. 4300001 and 4300002 (Lagoa Mirim, ",
+    "Lagoa dos Patos) are water bodies with no seat: lon/lat NA"),
+  source_mtime = NA_character_,
+  exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
 
 # ------------------------------------------------------------------ metadata --
 cat("\nMetadata:\n")
+# ----------------------------------------------------------- land_balance --
+# One row per municipality and year: where its harvested soy area goes in step 20 (mass
+# allocation), from the per-municipality land balance step 20 writes and checks
+# (footprints/<Y>_land_balance_mun.csv; code/shared/land_balance.R). The identity closes per row.
+# These are UNFILTERED totals: the footprint tables drop cells below FP_MIN_HA, so their sums
+# are lower by a few thousandths of a percent. The yearly totals must equal the national
+# identity of step 20 (footprints/<Y>_land_identity.csv); the build stops otherwise.
+LB_COLS <- c("harvested_ha", "footprint_food_ha", "footprint_nonfood_ha", "stock_change_dropped_ha",
+             "balancing_dropped_ha", "nonproductive_lost_ha")
+for (Y in START:END) {
+  f  <- file.path(DATA_DIR, "generated/footprints", sprintf("%d_land_balance_mun.csv", Y))
+  fn <- file.path(DATA_DIR, "generated/footprints", sprintf("%d_land_identity.csv", Y))
+  if (!file.exists(f) || !file.exists(fn)) next
+  x <- read.csv(f); nat <- read.csv(fn)
+  ref <- c(nat$harvested_ha, nat$kept_food_ha, nat$kept_nonfood_ha, nat$stock_addition_ha, nat$balancing_ha,
+           nat$nonproductive_lost_ha)
+  if (any(abs(colSums(x[, LB_COLS]) - ref) > 1e-6 * nat$harvested_ha))
+    stop("[release] land_balance ", Y, ": municipal totals differ from the national land identity")
+  land_balance <- x %>%
+    transmute(co_mun = as.integer(co_mun), harvested_ha, footprint_food_ha, footprint_nonfood_ha,
+              stock_change_dropped_ha, balancing_dropped_ha, nonproductive_lost_ha, traced_share,
+              year = as.integer(Y)) %>%
+    arrange(co_mun)
+  write_fact(land_balance, "land_balance", Y)
+  note_prov("land_balance", Y, f)
+}
+
 git <- function(a) tryCatch(trimws(system2("git", a, stdout = TRUE, stderr = FALSE)[1]),
                             error = function(e) NA_character_)
 meta_build <- data.frame(
@@ -451,6 +529,25 @@ if (length(FP_BUILT)) {
       source_mtime = NA_character_,
       exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
   }
+}
+# Build-level notes (year NA): choices that shape every table and are not visible from file paths.
+.prov_note <- function(tbl, txt) PROV[[length(PROV) + 1L]] <<- data.frame(
+  tbl = tbl, year = NA_integer_, source_file = txt, source_mtime = NA_character_,
+  exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
+.prov_note("production", paste0("NOTE: IBGE PAM (SIDRA table 1612; planted area v109, harvested area v216, ",
+  "production v214) for 2014-2022 as retrieved from the SIDRA API on 2026-10-05, including IBGE's revision of 2021; ",
+  "2000-2013 as retrieved earlier. Earlier builds had production value in place of tonnes for 2014-2022."))
+.prov_note("domestic_use", paste0("NOTE: IBGE herds (SIDRA table 3939) for 2014-2022 re-downloaded 2026-10-05; ",
+  "earlier builds had the herd types in the wrong columns for those years, which distorted feed by species."))
+.prov_note("trade", paste0("NOTE: soybean cake balance rebuilt in step 00_FAO: exports = COMEX heading 2304 (national ",
+  "total of the municipal export files), production = 0.75 x beans processed, feed = production - exports. ",
+  "FAO food balance sheets carry no soybean cake."))
+for (.t in c("footprint_country", "footprint_product", "footprint_animal_country")) {
+  .prov_note(.t, paste0("NOTE: step 17 column cap removed (adj_prod = FALSE) from this build on. Earlier builds ",
+    "scaled Leontief columns with sums >= 1, which removed 3.9-4.8 Mha of soy land per year. Step 20 now enforces ",
+    "harvested area = kept final demand + stock additions dropped + balancing dropped, within 0.01%."))
+  .prov_note(.t, paste0("NOTE: feed point. Soybean cake fed to animals outside Brazil is attributed to the country ",
+    "where it is fed and appears as final product c081, not traced to consumers of animal products."))
 }
 meta_provenance <- bind_rows(PROV)
 write_dim(meta_provenance, "meta_provenance")
