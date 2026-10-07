@@ -35,8 +35,9 @@ The combined re-run of 2026-10-06 is finished. **Nothing is running.** Report:
   own file agrees to within 1e-14 relative. See `RUNBOOK.md`, "Building the release".
 - **Zenodo draft 23057008 updated 2026-10-07, NOT published:** `soyprint.sqlite`, `soyprint_parquet.zip` and
   `data_dictionary.csv` are now the `e35c056` build (checksums verified); metadata merged from
-  `zenodo_metadata_v2.json` (CC BY 4.0). Its `README.md`, `LICENSE.txt` and `MD5SUMS.txt` are still the OLD ones;
-  the user sends the final versions. Report: `generated/diagnostics/2026-10-07_validation/REPORT_validation_2026-10-07.md`
+  `zenodo_metadata_v2.json` (CC BY 4.0). Its `README.md`, `LICENSE.txt` and `MD5SUMS.txt` were replaced with the final
+  versions later the same day (README md5 `3778ec8e…`, one line reworded on the user's instruction); all six files now
+  belong to the `e35c056` package and match `generated/zenodo_staging_e35c056/`. Report: `generated/diagnostics/2026-10-07_validation/REPORT_validation_2026-10-07.md`
   (also: Technical Validation numbers on the new build, the 2019 sensitivity table, EXIOBASE versions 3.10.1 for
   2000-2020 and 3.9.5 for 2021-2022).
 - **Open:** probability maps exist for China and EU-27 (2022) only (step 21 ran out of its 34 GB cap); the paper
