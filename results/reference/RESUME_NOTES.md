@@ -20,7 +20,7 @@ The combined re-run of 2026-10-06 is finished. **Nothing is running.** Report:
   `e35c056`; `parquet/` 213 files, combined md5 `c5b24e76e8f261f88c961b09c0e6dbae`; `soyprint_parquet.zip`
   246,233,500 B, md5 `28b7e8aa736066806b7846143356c762`.
 - **Old freeze (`dbcfd77`) still in place** at `generated/soyprint.sqlite` and `generated/parquet/`; the Zenodo draft
-  still holds the OLD files and must not be published as it stands. The user replaces the files.
+  was updated on 2026-10-07 (see below) and must still not be published by Claude.
 - **Shared `generated/outputs/`, `generated/footprints/` and `results/tables/benchmarks/` hold the NEW run.** The old
   ones are in `generated/outputs_backup_precombined_2026-10-06/` and `generated/footprints_backup_precombined_2026-10-06/`.
 - **Kept:** the 23 year workers `generated/workers/fp<Y>/` with all matrices (about 60 GB); deleting them is the
@@ -33,6 +33,12 @@ The combined re-run of 2026-10-06 is finished. **Nothing is running.** Report:
 - **`land_balance` build procedure (decided 2026-10-07: no rebuild, document it):** the release's
   `footprints/<Y>_land_balance_mun.csv` were written by `code/prep/land_balance_mun.R <Y>` after step 20; step 20's
   own file agrees to within 1e-14 relative. See `RUNBOOK.md`, "Building the release".
+- **Zenodo draft 23057008 updated 2026-10-07, NOT published:** `soyprint.sqlite`, `soyprint_parquet.zip` and
+  `data_dictionary.csv` are now the `e35c056` build (checksums verified); metadata merged from
+  `zenodo_metadata_v2.json` (CC BY 4.0). Its `README.md`, `LICENSE.txt` and `MD5SUMS.txt` are still the OLD ones;
+  the user sends the final versions. Report: `generated/diagnostics/2026-10-07_validation/REPORT_validation_2026-10-07.md`
+  (also: Technical Validation numbers on the new build, the 2019 sensitivity table, EXIOBASE versions 3.10.1 for
+  2000-2020 and 3.9.5 for 2021-2022).
 - **Open:** probability maps exist for China and EU-27 (2022) only (step 21 ran out of its 34 GB cap); the paper
   text and figures; README, CITATION and LICENSE items of the earlier notes below.
 
