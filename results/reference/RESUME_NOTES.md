@@ -25,6 +25,11 @@ The combined re-run of 2026-10-06 is finished. **Nothing is running.** Report:
   ones are in `generated/outputs_backup_precombined_2026-10-06/` and `generated/footprints_backup_precombined_2026-10-06/`.
 - **Kept:** the 23 year workers `generated/workers/fp<Y>/` with all matrices (about 60 GB); deleting them is the
   user's call.
+- **2026-10-07 follow-up** (`generated/diagnostics/2026-10-07_loose_ends/REPORT_loose_ends_2026-10-07.md`): the two
+  paper maps are redrawn with IBGE outlines (`8342a30`); a clean `e35c056` run of 2013 reproduces every release table
+  byte for byte except `land_balance`, which matches to 1e-14 and exactly when `code/prep/land_balance_mun.R` is run
+  after step 20; files for the manuscript are in `generated/for_manuscript_2026-10-07/` (+ `.zip`); deposit files are
+  staged in `generated/zenodo_staging_e35c056/` (nothing uploaded). Scratch kept: `generated/workers/verify2013_e35c056/`.
 - **Open:** probability maps exist for China and EU-27 (2022) only (step 21 ran out of its 34 GB cap); the paper
   text and figures; README, CITATION and LICENSE items of the earlier notes below.
 
