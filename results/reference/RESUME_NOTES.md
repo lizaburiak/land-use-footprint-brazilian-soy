@@ -9,11 +9,24 @@ is tracked since `dbcfd77`).
   `-v DATA:DATA[:ro] -v ROOT:ROOT -w ROOT`.
 - **git inside the container:** pass `-e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*'`.
 
-## 0. IN PROGRESS 2026-10-06 (combined re-run) -- read this first
+## 0. COMBINED RE-RUN DONE 2026-10-07 -- read this first
 
-Briefing "Combined re-run: PAM, herds, no step-17 cap, cake exports from COMEX; rebuild, checks, figures"
-(2026-10-06). Reports: `generated/diagnostics/2026-10-05_input_audit/REPORT_input_audit_2026-10-05.md` (why) and
-`generated/diagnostics/2026-10-06_combined_rerun/` (this run).
+The combined re-run of 2026-10-06 is finished. **Nothing is running.** Report:
+`/mnt/bigdata/projects/soyprint/generated/diagnostics/2026-10-06_combined_rerun/REPORT_combined_rerun_2026-10-06.md`
+(why: `generated/diagnostics/2026-10-05_input_audit/REPORT_input_audit_2026-10-05.md`).
+
+- **New freeze candidate:** `generated/release_2026-10-06_e35c056/` -- `soyprint.sqlite` 3,071,246,336 B, md5
+  `875cc160f9a881892e45419e0825301c`, 27,254,164 rows in 15 tables (new table `land_balance`), `meta_build` commit
+  `e35c056`; `parquet/` 213 files, combined md5 `c5b24e76e8f261f88c961b09c0e6dbae`; `soyprint_parquet.zip`
+  246,233,500 B, md5 `28b7e8aa736066806b7846143356c762`.
+- **Old freeze (`dbcfd77`) still in place** at `generated/soyprint.sqlite` and `generated/parquet/`; the Zenodo draft
+  still holds the OLD files and must not be published as it stands. The user replaces the files.
+- **Shared `generated/outputs/`, `generated/footprints/` and `results/tables/benchmarks/` hold the NEW run.** The old
+  ones are in `generated/outputs_backup_precombined_2026-10-06/` and `generated/footprints_backup_precombined_2026-10-06/`.
+- **Kept:** the 23 year workers `generated/workers/fp<Y>/` with all matrices (about 60 GB); deleting them is the
+  user's call.
+- **Open:** probability maps exist for China and EU-27 (2022) only (step 21 ran out of its 34 GB cap); the paper
+  text and figures; README, CITATION and LICENSE items of the earlier notes below.
 
 **Decisions taken by the user (do not re-litigate):**
 
