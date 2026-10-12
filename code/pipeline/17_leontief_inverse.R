@@ -31,7 +31,8 @@ write = TRUE
 
 prep_solve <- function(year, Z, Y, X,
                        adj_X = FALSE, adj_A = TRUE, adj_diag = FALSE,
-                       adj_prod = TRUE, prod_cap = 0.9999) {
+                       adj_prod = FALSE, prod_cap = 0.9999,
+                       adj_same = TRUE, same_cap = 0.9999, alloc = NA_character_) {
 
   if(adj_X) {X <- X + 1e-10}
 
@@ -47,15 +48,15 @@ prep_solve <- function(year, Z, Y, X,
   if(adj_A) {A[A < 0] <- 0}
   if(adj_diag) {diag(A)[diag(A) == 1] <- 1 - 1e-10}
 
-  # Productiveness safeguard (2026-07): a column of A with sum >= 1 is non-productive
-  # (intermediate use >= gross output), which makes I-A singular and drives (I-A)^-1
-  # into large negative entries. The FABIO base is non-productive in ~3,600 columns
-  # every year; the MRIO build normally absorbs this, but the 2020 build does not
-  # (COVID-year base: outputs collapsed, use structure did not) -> ~3,200 non-productive
-  # FABIO-country columns and 55k negative Leontief entries (the Philippines footprint
-  # went net-negative as a result). Cap each offending column's sum just below 1 by
-  # proportional down-scaling so the system is productive. Columns already productive
-  # (colSum < prod_cap) are untouched, so productive-build years (2010-2019) are a no-op.
+  # Column cap, OFF by default since 2026-10-06 (adj_prod = FALSE). It scaled every column of A
+  # whose sum was >= prod_cap down to prod_cap, on the argument that such a column is
+  # non-productive. That only holds when all rows share one unit. Here rows are head, thousand
+  # head and tonnes, so column sums above 1 are normal: 430 birds or 11 pigs per tonne of meat,
+  # 1.05 t of beans per tonne of oil plus cake. The cap hit 2,900-3,600 columns in EVERY year
+  # (not only 2020, for which it was written), broke land conservation and removed 3.9-4.8 Mha
+  # of Brazilian soy land per year from the footprint, including nearly all poultry before 2010
+  # (birds are counted in head in the v1.1 inputs). Step 20 now checks the land identity instead.
+  # Evidence: generated/diagnostics/2026-10-05_input_audit/REPORT_input_audit_2026-10-05.md.
   if(adj_prod) {
     cs <- Matrix::colSums(A)
     bad <- which(cs >= prod_cap)
@@ -68,6 +69,35 @@ prep_solve <- function(year, Z, Y, X,
       cat(sprintf("[17] productiveness safeguard (%d): no non-productive columns (max colSum %.4f); no-op\n",
                   year, max(cs)))
     }
+  }
+
+  # SAME-ITEM RULE (2026-10-06). A column is truly non-productive when it uses 1 unit or more
+  # of its OWN item (summed over all regions) per unit of output: both sides are then in the
+  # same unit. Example, 2020: Philippines milk, 17,000 t of output using 10.5 t of milk per
+  # tonne, which made five soy-land multipliers and the Philippines' footprint negative. Only
+  # such columns are scaled, to same_cap, by one factor for the whole column. There are a
+  # handful per year (7 in 2020) against the ~3,000 the old cap hit. Each one is logged to
+  # footprints/<Y>_scaled_columns.csv, and step 20 reports the soy land this removes.
+  if(adj_same) {
+    nmA <- if (!is.null(colnames(A))) colnames(A) else rownames(A)   # Z is square; rows and columns share labels
+    cm  <- sub(".*_", "", nmA)
+    tr  <- Matrix::summary(A)
+    sel <- cm[tr$i] == cm[tr$j]
+    ss  <- numeric(ncol(A))
+    if (any(sel)) { agg <- rowsum(tr$x[sel], tr$j[sel]); ss[as.integer(rownames(agg))] <- agg[, 1] }
+    rm(tr, sel)
+    bad <- which(ss >= 1)
+    if(length(bad) > 0) {
+      d <- rep(1, ncol(A)); d[bad] <- same_cap / ss[bad]
+      A <- A %*% Matrix::Diagonal(x = d)
+      .scaled_log[[length(.scaled_log) + 1L]] <<- data.frame(
+        year = year, allocation = alloc, column = nmA[bad],
+        area_code = sub("_.*", "", nmA[bad]), comm_code = cm[bad],
+        same_item_input_per_unit = ss[bad], scale = d[bad], output = X[bad],
+        stringsAsFactors = FALSE)
+    }
+    cat(sprintf("[17] same-item rule (%d, %s): scaled %d column(s)%s\n", year, alloc, length(bad),
+                if (length(bad)) sprintf(" (max ratio %.2f)", max(ss)) else ""))
   }
 
   L <- .sparseDiagonal(nrow(A)) - A
@@ -91,6 +121,7 @@ Y <- readRDS(file.path(DATA_DIR, "generated/fabio/Y.rds"))
 X <- readRDS(file.path(DATA_DIR, "generated/fabio/X.rds"))
 
 
+.scaled_log <- list()
 for(year in years){
   
   print(year)
@@ -99,13 +130,26 @@ for(year in years){
   
   L <- prep_solve(year = year, Z = Z_m[[as.character(year)]],
                   Y = Y[[as.character(year)]], X = X[, as.character(year)],
-                  adj_diag = adjust)
+                  adj_diag = adjust, alloc = "mass")
   if (write) saveRDS(L, paste0(DATA_DIR, "/generated/fabio/", year, "_L_mass.rds"))
   
   L <- prep_solve(year = year, Z = Z_v[[as.character(year)]],
                   Y = Y[[as.character(year)]], X = X[, as.character(year)],
-                  adj_diag = adjust)
+                  adj_diag = adjust, alloc = "value")
   if (write) saveRDS(L, paste0(DATA_DIR, "/generated/fabio/", year, "_L_value.rds"))
+
+  # log of the columns scaled by the same-item rule (header only when there are none)
+  sc <- if (length(.scaled_log)) do.call(rbind, .scaled_log) else data.frame(
+    year = integer(), allocation = character(), column = character(), area_code = character(),
+    comm_code = character(), same_item_input_per_unit = numeric(), scale = numeric(), output = numeric())
+  .reg <- fread(file.path(DATA_DIR, "fabio/v2/inst/regions_full.csv"))
+  .itm <- fread(file.path(DATA_DIR, "fabio/v2/inst/items_full.csv"))
+  .ac <- suppressWarnings(as.numeric(sc$area_code))
+  sc$region <- ifelse(!is.na(.ac) & .ac > 1000, "BR municipality", .reg$iso3c[match(.ac, .reg$code)])
+  sc$item <- .itm$item[match(sc$comm_code, .itm$comm_code)]
+  dir.create(paste0(DATA_DIR, "/generated/footprints"), recursive = TRUE, showWarnings = FALSE)
+  if (write) write.csv(sc, paste0(DATA_DIR, "/generated/footprints/", year, "_scaled_columns.csv"), row.names = FALSE)
+  .scaled_log <- list()
   
 }
 

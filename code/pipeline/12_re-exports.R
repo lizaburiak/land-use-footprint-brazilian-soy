@@ -113,6 +113,24 @@ btd_MUN_imp <- imp %>% dplyr::select(co_mun, item_code, from_code, import) %>%
   rename("to_code" = "co_mun", "value" = "import") %>%
   relocate(to_code, .after = from_code) %>% relocate(item_code, .before = from_code)
 
+# COMEX records a few municipal flows whose partner is Brazil itself (re-imports and the like;
+# partner code 21): 2016 one oil import of 2.7 t, 2021 and 2022 two exports of about 0.5 t, and
+# zero-tonne rows where step 05 scaled a product's imports to nothing (cake, 2020). Brazil-national
+# is not an endpoint of the soy matrices (Brazil is fully municipalized), so the orphan guard
+# below stops on them. They are dropped here, before both the matrices and the CBS
+# harmonization, and logged. The exception is narrow on purpose: more than 100 t in a year
+# stops the run, and any other code outside the matrix still reaches the guard.
+.bra_imp <- btd_MUN_imp$from_code == 21; .bra_exp <- btd_MUN_exp$to_code == 21
+.bra_t <- sum(abs(btd_MUN_imp$value[.bra_imp]), na.rm = TRUE) + sum(abs(btd_MUN_exp$value[.bra_exp]), na.rm = TRUE)
+if (any(.bra_imp) || any(.bra_exp))
+  cat(sprintf("[12] dropped %d municipal flow(s) with Brazil as partner (code 21), %.2f t in total\n",
+              sum(.bra_imp) + sum(.bra_exp), .bra_t))
+if (.bra_t > 100)
+  stop(sprintf("[12] %.1f t of municipal soy trade has Brazil itself as partner (YEAR=%d); more than the 100 t this exception allows.",
+               .bra_t, YEAR), call. = FALSE)
+btd_MUN_imp <- btd_MUN_imp[!.bra_imp, ]
+btd_MUN_exp <- btd_MUN_exp[!.bra_exp, ]
+
 btd_MUN_intra <- intra %>%
   mutate(item_code = soy_items[product]) %>%
   dplyr::select(!product) %>%

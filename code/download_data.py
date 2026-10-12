@@ -41,6 +41,10 @@ BASE_DIR = Path(__file__).parent
 # Write straight into the pipeline's input tree (data/raw/), organized by source
 # subfolder, so downloaded files are read by the pipeline with no manual moving.
 RAW_DIR = DATA_DIR / "raw"
+# Files that exist are skipped unless --force is given. NB: this skip is why the 2014+ PAM and
+# herd files written by an earlier, faulty version of this script survived its July 2026 fix.
+# Archive the old file first when forcing a re-download.
+FORCE = False
 YEARS = list(range(2014, 2026))  # 2014 through 2025
 
 # Retry settings
@@ -70,7 +74,7 @@ def download(url, dest, encoding=None, timeout=120):
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    if dest.exists() and dest.stat().st_size > 0:
+    if dest.exists() and dest.stat().st_size > 0 and not FORCE:
         log(f"  Already exists, skipping: {dest.name}")
         return True
 
@@ -219,7 +223,7 @@ def download_sidra_production(years, dry_run=False):
             log(f"  Would download SIDRA 1612 for {year} -> {dest}")
             continue
 
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and dest.stat().st_size > 0 and not FORCE:
             log(f"  Already exists, skipping: {dest.name}")
             continue
 
@@ -288,7 +292,7 @@ def download_sidra_population(years, dry_run=False):
             log(f"  Would download SIDRA population for {year} -> {dest}")
             continue
 
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and dest.stat().st_size > 0 and not FORCE:
             log(f"  Already exists, skipping: {dest.name}")
             continue
 
@@ -393,7 +397,7 @@ def download_sidra_livestock(years, dry_run=False):
             log(f"  Would download SIDRA 3939 for {year} -> {dest}")
             continue
 
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and dest.stat().st_size > 0 and not FORCE:
             log(f"  Already exists, skipping: {dest.name}")
             continue
 
@@ -476,7 +480,7 @@ def download_sidra_milkcows(years, dry_run=False):
             log(f"  Would download SIDRA 94 for {year} -> {dest}")
             continue
 
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and dest.stat().st_size > 0 and not FORCE:
             log(f"  Already exists, skipping: {dest.name}")
             continue
 
@@ -623,7 +627,7 @@ def download_faostat_cbs(years, dry_run=False):
 
     for year in years:
         dest = RAW_DIR / "00" / "FAO_CBS" / f"CBS_SOY_{year}_FAO.xlsx"
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and dest.stat().st_size > 0 and not FORCE:
             log(f"  Already exists, skipping: {dest.name}")
             continue
 
@@ -762,7 +766,7 @@ def download_faostat_trade(years, dry_run=False):
     # Step 3: Write per-year CSV files
     for year in years:
         dest = RAW_DIR / "04" / f"FAOSTAT_tradematrix_BRAsoy_{year}.csv"
-        if dest.exists() and dest.stat().st_size > 0:
+        if dest.exists() and dest.stat().st_size > 0 and not FORCE:
             log(f"  Already exists, skipping: {dest.name}")
             continue
 
@@ -857,7 +861,7 @@ def download_municipality_codes(years, dry_run=False):
         log(f"  Would download IBGE municipality codes -> {dest}")
         return
 
-    if dest.exists() and dest.stat().st_size > 0:
+    if dest.exists() and dest.stat().st_size > 0 and not FORCE:
         log(f"  Already exists, skipping: {dest.name}")
         return
 
@@ -918,7 +922,11 @@ def main():
                         help="Only download specific sources: comex, comex_lookups, sidra_prod, sidra_pop, sidra_livestock, sidra_milkcows, faostat_cbs, faostat_trade, boundaries, mun_codes")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be downloaded without actually downloading")
+    parser.add_argument("--force", action="store_true",
+                        help="Re-download and overwrite files that already exist (archive them first)")
     args = parser.parse_args()
+    global FORCE
+    FORCE = args.force
 
     years = sorted(args.years)
     only = set(args.only) if args.only else None

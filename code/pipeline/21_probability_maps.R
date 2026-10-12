@@ -73,7 +73,31 @@ P_value <- cbind(P_value$A_country, P_value$B_country, P_value$A_product, P_valu
 
 # load MU polygons and project to WGS84
 GEO_MUN_SOY <- readRDS(paste0(DATA_DIR, "/generated/outputs/05_", YEAR, "/GEO_MUN_SOY_fin.rds")) %>% st_transform(crs = 4326)
-GEO_states <- st_read(file.path(DATA_DIR, "geo/GADM_boundaries/gadm36_BRA_1.shp"), stringsAsFactors = FALSE) %>% st_transform(crs = 4326)
+# State outlines: dissolved from the IBGE-based municipal polygons by state (no GADM layer: its
+# licence is non-commercial, so it must not appear in a published figure). The municipal polygons
+# do not tile perfectly, so gaps under 500 m are closed and only each part's outer ring is kept.
+.outer_rings <- function(g) {
+  parts <- suppressWarnings(st_cast(st_sfc(g), "POLYGON"))
+  st_union(st_sfc(lapply(parts, function(p) st_polygon(list(p[[1]])))))[[1]]
+}
+GEO_states <- GEO_MUN_SOY %>% st_transform(crs = 5880) %>% st_make_valid() %>%
+  group_by(nm_state) %>% summarise(.groups = "drop")
+st_geometry(GEO_states) <- st_sfc(lapply(st_geometry(st_buffer(st_buffer(GEO_states, 500), -500)), .outer_rings), crs = 5880)
+GEO_states <- st_transform(GEO_states, crs = 4326)
+
+# Map style: white background and a legend that stays legible when the figure is one column
+# wide (the PNG is 24 x 20 cm, so 18 pt text is about 6-7 pt at 8.5 cm).
+.map_theme <- theme(plot.background = element_rect(fill = "white", colour = NA),
+                    plot.margin = margin(t = 0, r = 0.8, b = -0.1, l = -0.2, "cm"),   # room for the legend title
+                    plot.title = element_text(hjust = 0.5, size = 16, colour = "black"),
+                    legend.title = element_text(size = 18, colour = "black"),
+                    legend.text = element_text(size = 18, colour = "black"),
+                    legend.key.height = grid::unit(2.2, "cm"), legend.key.width = grid::unit(0.8, "cm"),
+                    legend.ticks = element_line(colour = "black"))
+
+# Optional: SOYPRINT_PROB_GROUPS="China,EU-27" limits the destination-group maps to those groups
+# and skips the product maps (each group burns 85 tiles at 30 m and needs a lot of memory).
+.only_groups <- trimws(strsplit(Sys.getenv("SOYPRINT_PROB_GROUPS", ""), ",")[[1]])
 
 
 # S3 method: makes is.finite() work on the data.frames below (base errors on lists)
@@ -144,6 +168,7 @@ grp_of  <- function(iso) ifelse(iso == "BRA", "Brazil-domestic",
     ifelse(!is.na(cont[iso]) & cont[iso] == "ASI", "Rest-of-Asia", "Rest-of-world"))))
 
 for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domestic")) {
+    if (length(.only_groups) && !grp %in% .only_groups) next
     for(alloc in c("value")) { # "mass",
 
       geo <- if(alloc == "mass") GEO_MUN_P_mass else GEO_MUN_P_value
@@ -199,7 +224,7 @@ for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domesti
       prob_dat <- gplot_data(prob_agg_vrt, maxpixels = ncell(prob_agg_vrt)) %>% dplyr::filter(!is.na(value))
       
       (prob_map <- ggplot() +
-          geom_sf(data = GEO_states, fill = "transparent", color = "darkgrey", size = 0.4) + # "gray19", "lightgrey"
+          geom_sf(data = GEO_states, fill = "transparent", color = "grey30", linewidth = 0.3) + # "gray19", "lightgrey"
           geom_tile(data = dplyr::filter(prob_dat, !is.na(value) & value > 0), 
                     aes(x = x, y = y, fill = value) ) +
           #scale_fill_gradient("Land use\nprobability",
@@ -207,21 +232,22 @@ for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domesti
           #                    na.value = NA) +
           scale_fill_viridis(direction = -1)+ #limits = c(1,80)
           coord_sf(datum = sf::st_crs(prob_agg_vrt)) +
-          labs(fill = "probability", title = paste(grp, "consumption: land-use probability,", alloc, "allocation")) + 
+          labs(fill = "Probability (%)", title = paste(grp, "consumption: land-use probability,", alloc, "allocation")) + 
           theme_void()+
           theme(plot.title = element_text(hjust = 0.5, size = 10), 
                 plot.margin = margin(t = -0.0, r = -0.2, b = -0.1, l = -0.2, "cm"),
                 legend.margin=margin(0,0,0,0), 
-                legend.box.margin=margin(t=0,r=0,b= 0,l=-60))
+                legend.box.margin=margin(t=0,r=0,b= 0,l=-60)) +
+          .map_theme
         #coord_quickmap()
       )
       
-      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_",grp,"_",alloc,".png"), prob_map, width = 12, height = 10, units = "cm", scale = 2)
+      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_",grp,"_",alloc,".png"), prob_map, width = 12, height = 10, units = "cm", scale = 2, bg = "white")
       
       
       # for selected state
       state = "MT"
-      GEO_state <- filter(GEO_states, HASC_1 == paste0("BR.", state))
+      GEO_state <- filter(GEO_states, nm_state == state)
       prob_state <- crop(prob_agg_vrt, extent(GEO_state))
       #rast_temp_state[] <- NA
       rast_temp_state <- fasterize(GEO_state, prob_state)
@@ -229,7 +255,7 @@ for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domesti
       prob_dat_state <- gplot_data(prob_state, maxpixels = ncell(prob_state)) %>% dplyr::filter(!is.na(value))
       
       (prob_map_state <- ggplot() +
-          geom_sf(data = GEO_state, fill = "transparent", color = "darkgrey", size = 0.4) + # "gray19", "lightgrey"
+          geom_sf(data = GEO_state, fill = "transparent", color = "grey30", linewidth = 0.3) + # "gray19", "lightgrey"
           geom_tile(data = dplyr::filter(prob_dat_state, !is.na(value) & value > 0), 
                     aes(x = x, y = y, fill = value) ) +
           #scale_fill_gradient("Land use\nprobability",
@@ -237,17 +263,18 @@ for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domesti
           #                    na.value = NA) +
           scale_fill_viridis(direction = -1)+ #limits = c(1,80)
           coord_sf(datum = sf::st_crs(prob_agg_vrt)) +
-          labs(fill = "probability", title = paste(grp, "consumption: land-use probability,", alloc, "allocation")) + 
+          labs(fill = "Probability (%)", title = paste(grp, "consumption: land-use probability,", alloc, "allocation")) + 
           theme_void()+
           theme(plot.title = element_text(hjust = 0.5, size = 10), 
                 plot.margin = margin(t = -0.0, r = -0, b = -0.1, l = -0.2, "cm"),
                 legend.margin=margin(0,0,0,0), 
-                legend.box.margin=margin(t=0,r=0,b= 0,l=0))
+                legend.box.margin=margin(t=0,r=0,b= 0,l=0)) +
+          .map_theme
         #coord_quickmap()
       )
       
       
-      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_state_",grp,"_",alloc,".png"), prob_map_state, width = 12, height = 10, units = "cm", scale = 2)
+      ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_state_",grp,"_",alloc,".png"), prob_map_state, width = 12, height = 10, units = "cm", scale = 2, bg = "white")
 
 
     }
@@ -259,7 +286,7 @@ for (grp in c("China", "EU-27", "Rest-of-Asia", "Rest-of-world", "Brazil-domesti
 
 ## CHANGED: product codes ported from FABIO v1.1 to v2 numbering (v1.1 c110 Milk = v2 c109,
 # c114 Bovine = c113, c116 Pigmeat = c115, c117 Poultry = c116, c118 Other meat = c117)
-for (prod in c("c109", "c113", "c115", "c116", "c117", "total_food", "total_nonfood")) { # 
+for (prod in if (length(.only_groups)) character() else c("c109", "c113", "c115", "c116", "c117", "total_food", "total_nonfood")) { # 
   for(alloc in c("value")){ # "mass",
     
     # or: select product
@@ -309,7 +336,7 @@ for (prod in c("c109", "c113", "c115", "c116", "c117", "total_food", "total_nonf
     
     # plot
     (prob_map <- ggplot() +
-        geom_sf(data = GEO_states, fill = "transparent", color = "darkgrey", size = 0.4) + # gray19 lightgrey
+        geom_sf(data = GEO_states, fill = "transparent", color = "grey30", linewidth = 0.3) + # gray19 lightgrey
         geom_tile(data = dplyr::filter(prob_dat, !is.na(value)), 
                   aes(x = x, y = y, fill = value) ) +
         #scale_fill_gradient("Land use\nprobability",
@@ -317,16 +344,17 @@ for (prod in c("c109", "c113", "c115", "c116", "c117", "total_food", "total_nonf
         #                    na.value = NA) +
         scale_fill_viridis(direction = -1, limits = c(1,80))+
         coord_sf(datum = sf::st_crs(prob_agg_vrt)) +
-        labs(fill = "probability", title = paste(ifelse(substr(target,1,1)=="c",items$item[items$comm_code  == target],target), "consumption: land-use probability,", alloc, "allocation")) + 
+        labs(fill = "Probability (%)", title = paste(ifelse(substr(target,1,1)=="c",items$item[items$comm_code  == target],target), "consumption: land-use probability,", alloc, "allocation")) + 
         theme_void()+
         theme(plot.title = element_text(hjust = 0.5, size = 10), 
               plot.margin = margin(t = -0.0, r = -0.2, b = -0.1, l = -0.2, "cm"),
               legend.margin=margin(0,0,0,0), 
-              legend.box.margin=margin(t=0,r=0,b= 0,l=-60))
+              legend.box.margin=margin(t=0,r=0,b= 0,l=-60)) +
+        .map_theme
       #coord_quickmap()
     )
     
-    ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_",target,"_",alloc,".png"), prob_map, width = 12, height = 10, units = "cm", scale = 2)
+    ggsave(filename = paste0("results/maps/probability_maps/",YEAR,"_prob_map_",target,"_",alloc,".png"), prob_map, width = 12, height = 10, units = "cm", scale = 2, bg = "white")
     
     
   }

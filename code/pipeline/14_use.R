@@ -404,6 +404,13 @@ feed <- merge(feed_sup[, .(area_code, area, year, item_code, item, feedtype, moi
   sup_dry = dry, total_sup_dry = total_dry, sup_fresh = feed)],
   feed_req, by=c("area_code", "area", "year", "feedtype"), all = TRUE, allow.cartesian = TRUE)
 
+# FEED POINT (intended, documented 2026-10-06): feed_req has the classes crops, animals, residues,
+# fodder and grass. Oil cakes carry feedtype "cakes" in items_full.csv, which matches none of them,
+# so cake feed outside Brazil gets no livestock process here and is passed on below as
+# "unspecified" final demand of the country where it is fed (sup_excess). Soybean cake is thus
+# traced to the feed point abroad, not to the consumers of the animal products. Soybeans
+# (feedtype "crops") are allocated to livestock normally, and Brazilian municipalities get their
+# cake and bean feed by process from step 03 further down. Do not "fix" this without a decision.
 # TODO: why is this line in here twice with a small difference?
 feed[feedtype != "grass", req := req / total_req * total_sup_dry]
 

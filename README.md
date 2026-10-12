@@ -6,8 +6,8 @@
 
 ### 📄 Paper drafts (render in-browser): [**Data section**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/paper/data_section/data.pdf) · [**Methods section**](https://lizaburiak.github.io/land-use-footprint-brazilian-soy/paper/methods_section/methods.pdf)
 
-### 💾 [**Download the results database →**](https://drive.google.com/drive/folders/1RrzOPWyJePnxattB13CnMVdLt9UlbLrq?usp=sharing)
-All headline results in one place: `soyprint.duckdb` (every result table + analysis views, queryable from R/Python/DBeaver), Excel-friendly summary CSVs, and a README documenting each table. This is the fastest way to use the results without running the pipeline.
+### 💾 [**Download the results database →**](https://doi.org/10.5281/zenodo.23057008)
+The release (version 1.0.0, build commit `e35c056`, years 2000–2022) is deposited at Zenodo, DOI [10.5281/zenodo.23057008](https://doi.org/10.5281/zenodo.23057008): `soyprint.sqlite` (15 tables with keys and indexes), the same tables as Parquet (`soyprint_parquet.zip`), and `data_dictionary.csv` documenting every table and field. This is the fastest way to use the results without running the pipeline.
 
 ### Note for people interested in reproducing results:
 The model requires a wide range of input data for all modelling steps. All data is publicly and freely available, but cannot directly be provided here for download due to different copyright licenses. Instead, see [`DATA.md`](DATA.md) for the full manifest — where every dataset comes from and where it must be placed — plus the `code/download_data.py` script that programmatically fetches the auto-downloadable inputs straight into the pipeline's input tree. 
@@ -18,9 +18,9 @@ The model requires a wide range of input data for all modelling steps. All data 
 > year-parameterized model (`code/pipeline/`), its paper figures (`code/analysis/`) and
 > prep feeders (`code/prep/`), and the purpose-organized `data/` (raw/geo/fabio/trase/exiobase).
 >
-> **Running it:** from the repo root, `bash code/run_all.sh` runs the full pipeline
-> (steps 00–21) for all years 2000–2020 (or `bash code/run_all.sh 2013 2013` for one year).
-> See [`RUNBOOK.md`](RUNBOOK.md) for setup, data prerequisites, and per-year caveats.
+> **Running it:** each year runs in its own worker directory (`code/setup_worker.sh`,
+> `code/run_core.sh`, `code/run_fp.sh`), for 2000–2022. See [`RUNBOOK.md`](RUNBOOK.md) for the
+> steps, the software versions and how the release was built.
 
 ----
 

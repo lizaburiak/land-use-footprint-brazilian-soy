@@ -15,6 +15,12 @@ Three tiers:
 
 All of `data/` is git-ignored. Nothing below is committed; you download or regenerate it locally.
 
+**Data root.** The scripts read the data root from the environment variable `SOYPRINT_DATA_DIR`
+(default `/mnt/bigdata/projects/soyprint`). The paths below are written `data/...`; in the
+`e35c056` build `data/` was that data root, so `data/raw/00/` is `<data root>/raw/00/`.
+The inputs listed here are the ones steps 00-21 read in that build; they were checked on
+5 October 2026 (input audit, see [State of the inputs](#state-of-the-inputs-in-the-e35c056-build)).
+
 ---
 
 ## Quick start
@@ -27,11 +33,12 @@ python3 code/download_data.py --dry-run       # preview targets without download
 # 2. Add the manual + large-backend inputs (see tables below)
 
 # 3. Run the pipeline (see RUNBOOK.md)
-bash code/run_all.sh
+# one worker per year: code/setup_worker.sh, code/run_core.sh, code/run_fp.sh
 ```
 
 `download_data.py` writes each file straight into the `data/raw/<step>/<SOURCE>/` location the
-pipeline reads it from — no manual moving needed. Files that already exist are skipped.
+pipeline reads it from — no manual moving needed. Files that already exist are skipped unless
+`--force` is given; archive the old files first.
 
 ---
 
@@ -44,11 +51,11 @@ Fetched programmatically for **2014–2025** (years 2000–2013 come from the or
 |---|---|---|
 | COMEX municipal trade (exports/imports) | MDIC — balanca.economia.gov.br | `data/raw/00/COMEX_exports/`, `data/raw/00/COMEX_imports/` |
 | COMEX lookup tables (country / municipality codes) | MDIC | `data/raw/00/COMEX_codes/` (+ `PAIS_COMEX.csv` copied to `data/raw/04/`) |
-| Soybean production (IBGE SIDRA table 1612) | IBGE SIDRA API | `data/raw/00/IBGE_production/` |
-| Population (IBGE SIDRA table 6579) | IBGE SIDRA API | `data/raw/00/IBGE_population/` |
-| Livestock headcounts (IBGE SIDRA table 3939) | IBGE SIDRA API | `data/raw/00/IBGE_livestock/` |
-| Milked cows (IBGE SIDRA table 94) | IBGE SIDRA API | `data/raw/00/IBGE_milkcows/` |
-| FAOSTAT commodity balance (FBS, soy) | FAOSTAT bulk | `data/raw/00/FAO_CBS/` |
+| Soybean production (IBGE SIDRA table 1612; planted area, harvested area, production) | IBGE SIDRA API. 2014–2024 re-downloaded on 5 October 2026 | `data/raw/00/IBGE_production/` |
+| Population (IBGE SIDRA table 6579) | IBGE SIDRA API. Checked against SIDRA on 5 October 2026; not re-downloaded | `data/raw/00/IBGE_population/` |
+| Livestock headcounts (IBGE SIDRA table 3939) | IBGE SIDRA API. 2014–2025 re-downloaded on 5 October 2026 with `--force` | `data/raw/00/IBGE_livestock/` |
+| Milked cows (IBGE SIDRA table 94) | IBGE SIDRA API. Checked against SIDRA on 5 October 2026; not re-downloaded | `data/raw/00/IBGE_milkcows/` |
+| FAOSTAT commodity balance (FBS, soy): `CBS_SOY_<Y>_FAO.xlsx`, beans and oil only (see below), and the bulk file `_faostat_fbs_bulk.csv` read by step 05b | FAOSTAT bulk | `data/raw/00/FAO_CBS/` |
 | FAOSTAT bilateral trade matrix (soy) | FAOSTAT bulk | `data/raw/04/` |
 | Municipality code list | IBGE localidades API | `data/raw/00/IBGE_municipalities/` |
 | Municipality boundaries | generates an R helper using the `geobr` package | `data/raw/00/IBGE_boundaries/` |
@@ -68,9 +75,9 @@ Not automatable — download once from the source and save to the listed path.
 | ABIOVE processing/refining capacity | https://abiove.org.br/estatisticas/ | `data/raw/00/ABIOVE_processing/ABIOVE_raw_capacity_{YEAR}.xlsx` |
 | ANP biodiesel capacity | https://www.gov.br/anp/ (annual yearbook, Table 2.6) | `data/raw/00/ANP_biodiesel/Biodiesel_capacity_{YEAR}_ANP.xlsx` |
 | IBGE POF (soy-oil consumption) | https://www.ibge.gov.br/ (POF 2017–2018) | `data/raw/00/IBGE_POF/POF_soy_oil_{YEAR}_IBGE.csv` |
-| IBGE grain storage (armazéns) | https://sidra.ibge.gov.br/tabela/278 | `data/raw/00/IBGE_storage/armazens_{YEAR}.shp` |
-| IBGE localities (capitals) | IBGE geoftp | `data/raw/00/IBGE_localities/` |
-| IBGE feedlot-cattle census (2017, table 6911) | https://sidra.ibge.gov.br/tabela/6911 | `data/raw/02/FeedlotCattle_2017_tabela6911_IBGE.xlsx` |
+| IBGE grain storage (armazéns) | https://sidra.ibge.gov.br/tabela/278 | `data/raw/00/IBGE_storage/armazens_2014.shp` (the one file step 00 reads) |
+| IBGE localities (capitals) | IBGE geoftp | `data/raw/00/IBGE_localities/` (`BR_Localidades_2010_v1.*` for step 00, `BR_Localidades_2022.gpkg` for the release builder) |
+| IBGE feedlot-cattle census (2006, table 919) | IBGE SIDRA | `data/raw/02/FeedlotCattle_2006_tabela919_IBGE.xlsx` |
 | FAO gridded livestock (GLW3, 2010) | https://dataverse.harvard.edu/dataverse/glw | `data/raw/02/geo/FAO_gridded_livestock/` |
 | FAO GLEAM production-system raster & feed ratios | https://www.fao.org/gleam/ | `data/raw/02/geo/FAO_gridded_livestock/`, `data/raw/03/Feed_ratios_FAO.xlsx` |
 
@@ -82,16 +89,43 @@ Needed for the footprint steps (13–21) and transport; obtain separately.
 
 | Dataset | Source | Save to |
 |---|---|---|
-| FABIO bilateral trade (1986–2013 prebuilt) | https://doi.org/10.5281/zenodo.2577066 | `data/fabio/trade/` |
+| FABIO bilateral trade (1986–2013 prebuilt): `btd_bal.rds`, `FABIO_exp/{v1,pure}/`, `FABIO_exp/items.csv`, `FAO_regions_full.csv`, `FABIO_regions.xlsx`, and the 2013 `FAOSTAT_tradematrix_BRAsoy.csv` used for 2000–2013 | https://doi.org/10.5281/zenodo.2577066 | `data/fabio/trade/` |
+| FABIO bilateral trade and balances, 2010–2023: `btd_bal.RData`, `cbs_full.rds` (steps 04 and 12 from 2014 and 2010 respectively) | fineprint-global / WU | `data/fabio/trade/new/` |
 | FABIO v2 backend (2010–2023) | fineprint-global / WU | `data/fabio/v2/` |
 | FABIO v1.1 backend for pre-2010 years (`btd_full` 1986–2019, `E` 1986–2013, `optim_results` 1961–2019, tidy files, label CSVs) | WU server `/mnt/nfs_fineprint/tmp/fabio/v1.1/` — steps 12/13/14/20 switch to it for `YEAR < 2010` | `data/fabio/v1.1/` |
-| FABIO pre-2010 staging (Stefan's 1986–2013 snapshots, for the 2000–2009 extension) | copies of `data/fabio/trade/` files — see its `README.md` for the v1.1 gap-closure notes | `data/fabio_before_2010/` |
-| EXIOBASE 3 (pxp) | https://www.exiobase.eu/ | `data/exiobase/pxp/` |
-| Trase composite benchmark | https://trase.earth/ | `data/trase/` |
+| FABIO pre-2010 staging (copies of the 1986–2013 files) | copies of `data/fabio/trade/` files — see its `README.md` for the v1.1 gap-closure notes. Not read by steps 00–21; they read `data/fabio/trade/` | `data/fabio_before_2010/` |
+| EXIOBASE 3 (pxp): version 3.10.1 for 2000–2020, 3.9.5 for 2021–2022 (from each `IOT_<Y>_pxp/metadata.json`). Steps 18–20 read `<Y>_{Z,L,x,Y}.RData`, made from the raw folders with `code/prep/prep_exiobase_rds.R` and `prep_exiobase_L.R`, plus `IO.codes.RData` and `../Y.codes.RData` | https://www.exiobase.eu/ | `data/exiobase/pxp/` |
+| Trase composite benchmark, `brazil_soy_v2_6_1_composite.csv` (v2.6.1) | https://trase.earth/ | `data/trase/` |
 | Spatial layers (GADM, OSM roads, DNIT waterways, ANTAQ ports, ANTT rail, IBGE biomes, MapBiomas soy tiles) | see `STRUCTURE.md` | `data/geo/` |
 
 The `data/geo/` spatial layers feed the transport step; the footprint steps (13–21)
 additionally require the FABIO v2 and EXIOBASE backends listed above.
+
+---
+
+## State of the inputs in the `e35c056` build
+
+From the input audit of 5 October 2026
+(`<data root>/generated/diagnostics/2026-10-05_input_audit/REPORT_input_audit_2026-10-05.md`):
+
+- **IBGE production (table 1612), 2014–2024, and herds (table 3939), 2014–2025:** re-downloaded
+  from SIDRA on 5 October 2026 with `code/download_data.py` (herds:
+  `--only sidra_livestock --force`; the exact options of the production run are
+  UNVERIFIED -- TODO). The earlier files had their columns in the wrong place;
+  they are kept in `_archive_shifted_2026-10-05/` and `_archive_scrambled_2026-10-05/` beside
+  the new ones. The 2000–2013 files were not changed.
+- **Milked cows (table 94) and population (table 6579):** compared with SIDRA on the same day
+  (125 of 125 and 95 of 95 values equal) and left as they were.
+- **Soybean cake balance:** no longer taken from the cake column of `CBS_SOY_<Y>_FAO.xlsx`
+  (FAO's balances carry no soybean cake; the origin of that column is UNVERIFIED -- TODO).
+  Step 00_FAO rebuilds it every year: exports = COMEX heading 2304 (national total of
+  `EXP_<Y>_MUN_COMEX.csv`), production = 0.75 x beans processed, feed = production - exports.
+  Beans and oil still come from the workbook.
+- **FAOSTAT trade matrix:** one file per year for 2014–2022 (`data/raw/04/`); 2000–2013 use
+  the single 2013 file in `data/fabio/trade/`.
+- **Not checked** (no machine-readable source to compare with): ABIOVE, ANP, POF, storage,
+  localities, feedlots, gridded livestock, feed ratios. FABIO, EXIOBASE and Trase were not
+  part of that audit.
 
 ---
 
