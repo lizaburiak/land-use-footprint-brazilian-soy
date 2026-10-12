@@ -532,11 +532,9 @@ if (length(FP_BUILT)) {
     PROV[[length(PROV) + 1L]] <- data.frame(
       tbl = t, year = NA_integer_,
       source_file = sprintf(paste0("THRESHOLD: rows below %g ha dropped (keeps %.4f%% of ",
-                                   "hectares); mass allocation (F_mass); years %s. ",
-                                   "Years before %d are excluded: unresolved municipal ",
-                                   "supply-use imbalance in that build (see build_release_parquet.R)"),
+                                   "hectares); mass allocation (F_mass); years %s"),
                             FP_MIN_HA, 100 * FP_TALLY[["ha_kept"]] / FP_TALLY[["ha_all"]],
-                            paste(range(fp_years), collapse = "-"), FP_MIN_YEAR),
+                            paste(range(fp_years), collapse = "-")),
       source_mtime = NA_character_,
       exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
   }
