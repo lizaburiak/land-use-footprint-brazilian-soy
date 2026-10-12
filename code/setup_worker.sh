@@ -18,7 +18,7 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
 mkdir -p "$W"/data/generated/{fabio,footprints,outputs} "$W"/run_logs "$W"/logs
 rsync -a --delete "$REPO/code/" "$W/code/"
-# run_fp.sh runs logs/fabio_probe/scripts/validate_footprints.R from the worker root
+# run_fp.sh ran its validation script from logs/ until it moved to code/validation/ (2026-10-12)
 rsync -a "$REPO/logs/" "$W/logs/"
 
 for d in exiobase fabio fabio_before_2010 geo new raw trase; do

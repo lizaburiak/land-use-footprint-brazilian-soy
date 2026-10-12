@@ -48,5 +48,5 @@ step 17_leontief_inverse  code/pipeline/17_leontief_inverse.R
 step 18_hybridize_B       code/pipeline/18_hybridize_B_quadrant.R
 step 19_invert_B          code/pipeline/19_invert_B.R
 step 20_footprints        code/pipeline/20_footrpints.R
-step validate_footprints  logs/fabio_probe/scripts/validate_footprints.R
+step validate_footprints  code/validation/validate_footprints.R
 echo "RUN COMPLETE"

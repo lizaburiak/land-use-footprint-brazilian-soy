@@ -39,7 +39,7 @@ build scripts, is in [Building the release](#building-the-release-procedure-of-t
 | 10, 11 | Trase benchmarks | `run_core.sh` |
 | 12 | re-exports | `run_fp.sh` |
 | 13-19 | supply and use tables, multi-regional table, Leontief inverse, link to EXIOBASE | `run_fp.sh` |
-| 20 | land-use footprints, then `logs/fabio_probe/scripts/validate_footprints.R` | `run_fp.sh` |
+| 20 | land-use footprints, then `code/validation/validate_footprints.R` | `run_fp.sh` |
 | 21 | probability maps (30 m) | by hand: `Rscript code/pipeline/21_probability_maps.R <YEAR>` |
 
 Step 06 (transport cost surface over roads, rail and waterways) is not part of the release,
@@ -118,8 +118,9 @@ python3 code/build_release_db.py --parquet <release dir>/parquet --out <release 
 python3 code/build_data_dictionary.py --db <release dir>/soyprint.sqlite --parquet <release dir>/parquet
 ```
 
-`run_fp.sh` ends with `logs/fabio_probe/scripts/validate_footprints.R`, which `setup_worker.sh`
-copies into the worker from the repository's `logs/` folder; that script is not tracked in git.
+`run_fp.sh` ends with `code/validation/validate_footprints.R`, which reaches the worker with the
+rest of `code/`. In the `e35c056` build the same file (md5 `d4961d0fdaa492198d453ae266a382f3`) was
+run from `logs/fabio_probe/scripts/`, where it was not tracked in git.
 
 **`land_balance`.** The release table `land_balance` is built from
 `footprints/<Y>_land_balance_mun.csv`. In the `e35c056` build these files were written by
