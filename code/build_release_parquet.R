@@ -78,8 +78,14 @@ write_dim <- function(df, tbl) {
 # FP_MIN_HA: the matrices carry a very long tail of numerically-nonzero dust --
 # keeping every cell makes the footprint layer ~73M rows (~20x the rest of the
 # database) while 0.01 ha keeps 99.945% of the hectares in 12.2% of the rows.
-# Measured on 2013; recorded in meta_provenance so the cut is never invisible.
+# (Measured on 2013 for the first build; the share kept by each build is tallied by
+# soy_triplets() below and written to meta_provenance, so the cut is never invisible.)
 FP_MIN_HA <- 0.01
+# Running totals of signed hectares over every footprint matrix read, before and after the
+# FP_MIN_HA cut. Filled by soy_triplets(); read when meta_provenance is written.
+FP_TALLY <- c(ha_all = 0, ha_kept = 0)
+# The four group aggregates of footprint_animal_country overlap its eight items (derivable).
+ANIMAL_GROUPS <- c("dairy", "meat", "meat-dairy", "meat-dairy-eggs")
 
 # FP_MIN_YEAR: first year of the footprint tables. 2000 was excluded until 2026-09-30: its
 # traced footprint was 20.7% of harvested area (64-78% in other years), which on 2026-09-23
@@ -91,15 +97,20 @@ FP_MIN_HA <- 0.01
 # manuscript (paper/data_section/data.tex:136) still says the series starts in 2001.
 FP_MIN_YEAR <- 2000L
 
-soy_triplets <- function(M) {
+soy_triplets <- function(M, skip_items = character()) {
   rn   <- rownames(M)
   code <- suppressWarnings(as.numeric(sub("_.*", "", rn)))
   comm <- sub(".*_", "", rn)
   keep <- !is.na(code) & code > 1000 & comm == "c021"
   Ms   <- M[keep, , drop = FALSE]
+  # animal-product columns are "<ISO3>_<item>": skip_items drops items before anything is counted
+  if (length(skip_items))
+    Ms <- Ms[, !substring(colnames(Ms), 5) %in% skip_items, drop = FALSE]
   tr   <- as.data.frame(Matrix::summary(Ms))
   if (!nrow(tr)) return(data.frame(co_mun = integer(), col = character(),
                                    value = numeric(), stringsAsFactors = FALSE))
+  big <- abs(tr$x) >= FP_MIN_HA
+  FP_TALLY <<- FP_TALLY + c(sum(tr$x), sum(tr$x[big]))
   data.frame(co_mun = as.integer(sub("_.*", "", rownames(Ms)))[tr$i],
              col    = colnames(Ms)[tr$j],
              value  = tr$x,
@@ -346,10 +357,9 @@ for (Y in YEARS) {
     note_prov("footprint_product", Y, ffp)
 
     # which animal product, in which country. Keep the 8 individual items; the 4 group
-    # aggregates (dairy, meat, meat-dairy, meat-dairy-eggs) overlap them and are derivable.
-    footprint_animal_country <- soy_triplets(FM$A_prod_country) %>%
+    # aggregates (ANIMAL_GROUPS) overlap them and are derivable.
+    footprint_animal_country <- soy_triplets(FM$A_prod_country, skip_items = ANIMAL_GROUPS) %>%
       mutate(consumer_iso3 = substr(col, 1, 3), item = substring(col, 5)) %>%
-      filter(!item %in% c("dairy", "meat", "meat-dairy", "meat-dairy-eggs")) %>%
       transmute(co_mun, consumer_iso3, item, hectares = value, year = as.integer(Y)) %>%
       arrange(co_mun, consumer_iso3, item)
     n$footprint_animal_country <- write_fact(footprint_animal_country,
@@ -521,11 +531,12 @@ if (length(FP_BUILT)) {
   for (t in FP_BUILT) {
     PROV[[length(PROV) + 1L]] <- data.frame(
       tbl = t, year = NA_integer_,
-      source_file = sprintf(paste0("THRESHOLD: rows below %g ha dropped (keeps ~99.95%% of ",
+      source_file = sprintf(paste0("THRESHOLD: rows below %g ha dropped (keeps %.4f%% of ",
                                    "hectares); mass allocation (F_mass); years %s. ",
                                    "Years before %d are excluded: unresolved municipal ",
                                    "supply-use imbalance in that build (see build_release_parquet.R)"),
-                            FP_MIN_HA, paste(range(fp_years), collapse = "-"), FP_MIN_YEAR),
+                            FP_MIN_HA, 100 * FP_TALLY[["ha_kept"]] / FP_TALLY[["ha_all"]],
+                            paste(range(fp_years), collapse = "-"), FP_MIN_YEAR),
       source_mtime = NA_character_,
       exported_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"), stringsAsFactors = FALSE)
   }
