@@ -73,7 +73,7 @@ run for 2022 only and produced the maps for China and EU-27 before running out o
   one 2013 file.
 - Steps 12, 13, 14 and 20 use the FABIO v1.1 files before 2010 and FABIO v2 from 2010.
   Step 12 produces re-exports in every year 2000-2022.
-- EXIOBASE is version 3.10.1 for 2000-2020 and 3.9.5 for 2021-2022.
+- EXIOBASE is version 3.10.1 for 2000-2022.
 - Steps 10 and 11 skip themselves in years without Trase data (before 2004).
 - Periodic inputs (boundaries, POF, biodiesel) use the nearest available year at or before the target.
 
