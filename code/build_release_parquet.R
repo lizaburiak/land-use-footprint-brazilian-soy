@@ -558,6 +558,11 @@ for (.t in c("footprint_country", "footprint_product", "footprint_animal_country
   .prov_note(.t, paste0("NOTE: feed point. Soybean cake fed to animals outside Brazil is attributed to the country ",
     "where it is fed and appears as final product c081, not traced to consumers of animal products."))
 }
+# The non-food side (EXIOBASE) enters through steps 18-20; versions from exiobase/pxp/IOT_<Y>_pxp/metadata.json.
+for (.t in c("footprint_country", "footprint_product", "land_balance")) {
+  .prov_note(.t, paste0("NOTE: EXIOBASE 3 (pxp) version 3.10.1 for 2000-2022 (non-food side, steps 18-20). ",
+    "Builds up to e35c056 used 3.9.5 for 2021-2022."))
+}
 meta_provenance <- bind_rows(PROV)
 write_dim(meta_provenance, "meta_provenance")
 

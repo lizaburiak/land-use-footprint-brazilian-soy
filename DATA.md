@@ -94,7 +94,7 @@ Needed for the footprint steps (13–21) and transport; obtain separately.
 | FABIO v2 backend (2010–2023) | fineprint-global / WU | `data/fabio/v2/` |
 | FABIO v1.1 backend for pre-2010 years (`btd_full` 1986–2019, `E` 1986–2013, `optim_results` 1961–2019, tidy files, label CSVs) | WU server `/mnt/nfs_fineprint/tmp/fabio/v1.1/` — steps 12/13/14/20 switch to it for `YEAR < 2010` | `data/fabio/v1.1/` |
 | FABIO pre-2010 staging (copies of the 1986–2013 files) | copies of `data/fabio/trade/` files — see its `README.md` for the v1.1 gap-closure notes. Not read by steps 00–21; they read `data/fabio/trade/` | `data/fabio_before_2010/` |
-| EXIOBASE 3 (pxp): version 3.10.1 for 2000–2020, 3.9.5 for 2021–2022 (from each `IOT_<Y>_pxp/metadata.json`). Steps 18–20 read `<Y>_{Z,L,x,Y}.RData`, made from the raw folders with `code/prep/prep_exiobase_rds.R` and `prep_exiobase_L.R`, plus `IO.codes.RData` and `../Y.codes.RData` | https://www.exiobase.eu/ | `data/exiobase/pxp/` |
+| EXIOBASE 3 (pxp): version 3.10.1 for 2000–2022 (from each `IOT_<Y>_pxp/metadata.json`). Steps 18–20 read `<Y>_{Z,L,x,Y}.RData`, made from the raw folders with `code/prep/prep_exiobase_rds.R` and `prep_exiobase_L.R`, plus `IO.codes.RData` and `../Y.codes.RData` | https://www.exiobase.eu/ | `data/exiobase/pxp/` |
 | Trase composite benchmark, `brazil_soy_v2_6_1_composite.csv` (v2.6.1) | https://trase.earth/ | `data/trase/` |
 | Spatial layers (GADM, OSM roads, DNIT waterways, ANTAQ ports, ANTT rail, IBGE biomes, MapBiomas soy tiles) | see `STRUCTURE.md` | `data/geo/` |
 
